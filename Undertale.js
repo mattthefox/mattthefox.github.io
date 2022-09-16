@@ -10,6 +10,7 @@ var debugCollision = false;
 var joystick;
 var confirmButton;
 var sprites = {};
+var loadIndicator;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -26,6 +27,10 @@ function myLoop(paths, index, callback) {
     let image = new Image();
     image.src = file;
     image.onload = function() {
+        loadIndicator.style.filter = "brightness: 100%"
+        setTimeout(function() {
+            loadIndicator.style.filter = "brightness: 0%"
+        },20)
         sprites[file] = image;
         if (index < paths.length - 1) {
             myLoop(paths, index + 1, callback)
@@ -1005,6 +1010,7 @@ window.addEventListener('load', function() {
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
+    loadIndicator = document.getElementById("loadIndicator");
     let initialMousePosX;
     let initialMousePosY;
     let mouseX;
