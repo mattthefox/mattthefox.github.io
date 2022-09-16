@@ -23,11 +23,12 @@ function SPR(file) {
 }
 
 function myLoop(paths, index, callback) {
+    console.log("./img/"+paths[index]+".png");
     let file = "./img/"+paths[index]+".png";
     let image = new Image();
     image.src = file;
     image.onload = function() {
-        loadIndicator.innerHTML = "Loaded "+index+" of "+(paths.length-1)
+        loadIndicator.innerHTML = "Loaded "+(index + 1)+" of "+paths.length
         sprites[file] = image;
         if (index < paths.length - 1) {
             myLoop(paths, index + 1, callback)
