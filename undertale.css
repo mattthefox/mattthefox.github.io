@@ -8,9 +8,23 @@ body {
 	position: fixed;
 }
 
+#loadIndicator {
+	width: 50px;
+}
+
 #undertale {
 	width: 80vw;
 	
+	position: fixed;
+	top:0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	
+	margin: auto;
+}
+
+.centered {
 	position: fixed;
 	top:0;
 	bottom: 0;

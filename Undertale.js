@@ -9,10 +9,39 @@ var tSounds = {}
 var debugCollision = false;
 var joystick;
 var confirmButton;
+var sprites = {};
+var loadIndicator;
 
 var vertKey = 0;
 var horzKey = 0;
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+
+function SPR(file) {
+    let path = "./img/"+file+".png"
+    console.log(sprites.path)
+    return sprites[path]
+}
+
+function myLoop(paths, index, callback) {
+    let file = "./img/"+paths[index]+".png";
+    console.log(file)
+    let image = new Image();
+    image.src = file;
+    image.onload = function() {
+        loadIndicator.innerHTML = "Loaded "+(index + 1)+" of "+paths.length
+        sprites[file] = image;
+        if (index < paths.length - 1) {
+            myLoop(paths, index + 1, callback)
+        } else {
+            callback();
+        }
+    }
+}
+
+function loadSprites(paths, callback) {
+    myLoop(paths,0,callback)
+}
+
 function lerp(min,max,t) {
     return (min*t)+max*(1-t)
 }
@@ -78,6 +107,7 @@ utFont.load().then(function(font){
     fontLoaded = true;
   });
 });
+
 document.onkeydown = checkKey;
 document.onkeyup = checkKeyUp;
 
@@ -294,13 +324,7 @@ class Sprite {
         "opacity": 1
     }
     constructor(file) {
-        this.file = "./img/"+file+".png";
-        this.image = new Image();
-        this.image.src = this.file;
-        this.image.addEventListener('load', () => {
-            console.log("loaded")
-            this.loaded = true;
-        }, false);
+        this.image = SPR(file)
     }
 
     addAnimation(name, animation) {
@@ -328,17 +352,13 @@ class Sprite {
     }
 
     draw(x,y) {
-        if (this.loaded) {
+        //if (this.image.complete) {
             canvas.drawImage(this.image,x,y);
-        }
+        //}
     }
 
     img(file) {
-        this.loaded = false;
-        this.image.src = "./img/"+file+".png";
-        this.image.onload = function() {
-            this.loaded = true;
-        }
+        this.image = SPR(file)
     }
 }
 
@@ -966,6 +986,30 @@ class Undertale {
 }
     
 window.addEventListener('load', function() {
+    loadIndicator = document.getElementById("loadIndicator");
+    loadSprites([
+        "enemy/dummy",
+        "ui/_act",
+        "ui/act",
+        "ui/_fight",
+        "ui/fight",
+        "ui/_item",
+        "ui/item",
+        "ui/_mercy",
+        "ui/mercy",
+        "ui/attackbar",
+        "battle_slash",
+        "soul_dead",
+        "soul_shard",
+        "soul",
+    ], spritesLoaded)
+
+    function lol() {
+
+    }
+    function spritesLoaded() {
+        let throbber = document.getElementById("throbber")
+    throbber.style.display = "none"
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
@@ -1116,7 +1160,7 @@ window.addEventListener('load', function() {
     textbox = new TypingText("I am test mr test. For real!!!!")
     undertale.spawn(textbox)
     //battlebox.interpTo(250,220,400,395)
-
+}
 })
 
 export {Sprite, Tickable, undertale, player}
