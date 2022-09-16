@@ -27,10 +27,7 @@ function myLoop(paths, index, callback) {
     let image = new Image();
     image.src = file;
     image.onload = function() {
-        loadIndicator.style.filter = "brightness: 100%"
-        setTimeout(function() {
-            loadIndicator.style.filter = "brightness: 0%"
-        },20)
+        loadIndicator.innerHTML = "Loaded "+index+" of "+(paths.length-1)
         sprites[file] = image;
         if (index < paths.length - 1) {
             myLoop(paths, index + 1, callback)
@@ -988,6 +985,7 @@ class Undertale {
 }
     
 window.addEventListener('load', function() {
+    loadIndicator = document.getElementById("loadIndicator");
     loadSprites([
         "enemy/dummy",
         "ui/_act",
@@ -1004,13 +1002,16 @@ window.addEventListener('load', function() {
         "soul_shard",
         "soul",
     ], spritesLoaded)
+
+    function lol() {
+
+    }
     function spritesLoaded() {
         let throbber = document.getElementById("throbber")
     throbber.style.display = "none"
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
-    loadIndicator = document.getElementById("loadIndicator");
     let initialMousePosX;
     let initialMousePosY;
     let mouseX;
