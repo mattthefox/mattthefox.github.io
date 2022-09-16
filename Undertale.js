@@ -17,14 +17,14 @@ var horzKey = 0;
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 function SPR(file) {
-    let path = "./img/"+file+".png"
+    let path = "/img/"+file+".png"
     console.log(sprites.path)
     return sprites[path]
 }
 
 function myLoop(paths, index, callback) {
-    console.log("./img/"+paths[index]+".png");
-    let file = "./img/"+paths[index]+".png";
+    let file = "/img/"+paths[index]+".png";
+    console.log(file)
     let image = new Image();
     image.src = file;
     image.onload = function() {
@@ -1002,7 +1002,7 @@ window.addEventListener('load', function() {
         "soul_dead",
         "soul_shard",
         "soul",
-    ], spritesLoaded)
+    ], lol)
 
     function lol() {
 
