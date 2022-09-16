@@ -12,6 +12,7 @@ var confirmButton;
 var sprites = {};
 var sounds = {}
 var loadIndicator;
+var backButton;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -19,8 +20,12 @@ const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 function SPR(file) {
     let path = "./img/"+file+".png"
-    console.log(sprites.path)
     return sprites[path]
+}
+
+function SND(file) {
+    let path = "./snd/"+file
+    return sounds[path]
 }
 
 function audioLoop(paths, index, callback) {
@@ -67,6 +72,7 @@ function lerp(min,max,t) {
 
 function playSound(path, loop = false) {
     let file = "./snd/"+path
+    sounds[file].currentTime = 0;
     sounds[file].play()
     sounds[file].loop = loop;
 }
@@ -193,7 +199,6 @@ class Tickable {
         this.prevX = this.x;
         this.prevY = this.y;
     }
-
     changePriority(priority) {
         this.priority = priority;
         undertale.tickables.sort((a, b) => (a.priority - b.priority))
@@ -203,13 +208,11 @@ class Tickable {
             canvas.drawImage(this.sprite.image,0,0);
         }
     }
-
     destroy() {
         undertale.tickables.splice(undertale.tickables.indexOf(this),1);
     }
     keyPressed(e) {}
     keyReleased(e) {}
-
     checkCollision() {
         if (this.collides) {
             for (let x in undertale.collision) {
@@ -656,8 +659,9 @@ class Soul extends Tickable {
         this.hp -= hp;
         if (this.hp <= 0 && !this.death) {
             this.hp = 0;
-            sounds[undertale.battle.music].pause()
-            sounds[undertale.battle.music].currentTime = 0
+            console.log(sounds[undertale.battle.music])
+            SND(undertale.battle.music).pause()
+            SND(undertale.battle.music).currentTime = 0
             this.collides = false;
             this.death = true;
             this.invincibility = -5
@@ -1047,6 +1051,7 @@ window.addEventListener('load', function() {
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
+    backButton = document.getElementById("backButton")
     let initialMousePosX;
     let initialMousePosY;
     let mouseX;
@@ -1066,6 +1071,21 @@ window.addEventListener('load', function() {
             })
           );
     }
+
+    backButton.onclick = function() {
+        document.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "X",
+              keyCode: 88, // example values.
+              code: "KeyX", // put everything you need in this object.
+              which: 88,
+              shiftKey: false, // you don't need to include values
+              ctrlKey: false,  // if you aren't going to use them.
+              metaKey: false   // these are here for example's sake.
+            })
+          );
+    }
+
     joystick.ontouchstart = function(event) {
         console.log("as")
         joystickDown = true;

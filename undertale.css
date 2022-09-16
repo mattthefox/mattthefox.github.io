@@ -13,7 +13,7 @@ body {
 }
 
 #undertale {
-	width: 80vw;
+	width: 90vw;
 	
 	position: fixed;
 	top:0;
@@ -36,7 +36,7 @@ body {
 
 @media screen and (orientation: landscape) {
 	#undertale {
-		width: 50vw;
+		width: 64vw;
 		
 		position: fixed;
 		top:0;
@@ -70,6 +70,14 @@ body {
 	position: fixed;
 	bottom: 0;
 	left: 75%;
+}
+
+#backButton {
+	opacity: 50%;
+	width: 10%;
+	position: fixed;
+	bottom: 0;
+	left: 65%;
 }
 
 #joystick {
