@@ -10,6 +10,7 @@ var debugCollision = false;
 var joystick;
 var confirmButton;
 var sprites = {};
+var sounds = {}
 var loadIndicator;
 
 var vertKey = 0;
@@ -22,24 +23,42 @@ function SPR(file) {
     return sprites[path]
 }
 
-function myLoop(paths, index, callback) {
+function audioLoop(paths, index, callback) {
+    let file = "./snd/"+paths[index];
+    let sound = new Audio(file);
+    //sound.onload = function() {
+        sounds[file] = sound;
+        console.log(sounds[file])
+        if (index < paths.length - 1) {
+            audioLoop(paths, index + 1, callback)
+        } else {
+            callback();
+        }
+    //}
+}
+
+function spriteLoop(paths, index, callback) {
     let file = "./img/"+paths[index]+".png";
     console.log(file)
     let image = new Image();
     image.src = file;
     image.onload = function() {
-        loadIndicator.innerHTML = "Loaded "+(index + 1)+" of "+paths.length
+        loadIndicator.innerHTML = "Loaded "+(index + 1)+" of "+paths.length+" sprites"
         sprites[file] = image;
         if (index < paths.length - 1) {
-            myLoop(paths, index + 1, callback)
+            spriteLoop(paths, index + 1, callback)
         } else {
             callback();
         }
     }
 }
 
+function loadAudio(paths, callback) {
+    audioLoop(paths,0,callback)
+}
+
 function loadSprites(paths, callback) {
-    myLoop(paths,0,callback)
+    spriteLoop(paths,0,callback)
 }
 
 function lerp(min,max,t) {
@@ -47,10 +66,9 @@ function lerp(min,max,t) {
 }
 
 function playSound(path, loop = false) {
-    let audio = new Audio('./snd/'+path);
-    audio.loop = loop;
-    audio.play();
-    tSounds[path] = audio;
+    let file = "./snd/"+path
+    sounds[file].play()
+    sounds[file].loop = loop;
 }
 
 function enemyAttackDone() {
@@ -66,6 +84,11 @@ function enemyAttackDone() {
         player.listLength = 0;
         player.attackProg = 1;
         textbox.show()
+    }
+    for (let x in undertale.tickables) {
+        if (undertale.tickables[x] instanceof Bullet) {
+            undertale.tickables[x].destroy()
+        }
     }
 }
 
@@ -182,7 +205,7 @@ class Tickable {
     }
 
     destroy() {
-        undertale.tickables.splice(indexOf(this),1);
+        undertale.tickables.splice(undertale.tickables.indexOf(this),1);
     }
     keyPressed(e) {}
     keyReleased(e) {}
@@ -633,8 +656,8 @@ class Soul extends Tickable {
         this.hp -= hp;
         if (this.hp <= 0 && !this.death) {
             this.hp = 0;
-            tSounds[undertale.battle.music].pause()
-            tSounds[undertale.battle.music].currentTime = 0
+            sounds[undertale.battle.music].pause()
+            sounds[undertale.battle.music].currentTime = 0
             this.collides = false;
             this.death = true;
             this.invincibility = -5
@@ -1004,12 +1027,23 @@ window.addEventListener('load', function() {
         "soul",
     ], spritesLoaded)
 
-    function lol() {
-
-    }
     function spritesLoaded() {
+        loadAudio([
+            "enemy.mp3",
+            "hurt.wav",
+            "snd_dbreak.wav",
+            "snd_dbreak2.wav",
+            "snd_heartshot.wav",
+            "snd_select.wav",
+            "snd_squeak.wav",
+            "SND_TXT2.wav"
+        ], audioLoaded)
+    }
+
+    function audioLoaded() {
         let throbber = document.getElementById("throbber")
     throbber.style.display = "none"
+    loadIndicator.style.display = "none"
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
