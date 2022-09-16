@@ -300,7 +300,6 @@ class Sprite {
         this.image.addEventListener('load', () => {
             console.log("loaded")
             this.loaded = true;
-            this.prevLoaded = true;
         }, false);
     }
 
@@ -330,7 +329,7 @@ class Sprite {
     }
 
     draw(x,y) {
-        if (this.loaded || this.prevLoaded) {
+        if (this.loaded) {
             canvas.drawImage(this.image,x,y);
         }
     }
@@ -338,10 +337,9 @@ class Sprite {
     img(file) {
         this.loaded = false;
         this.image.src = "./img/"+file+".png";
-        this.image.addEventListener('load', () => {
-            console.log("loaded")
+        this.image.onload = function() {
             this.loaded = true;
-        }, false);
+        }
     }
 }
 
