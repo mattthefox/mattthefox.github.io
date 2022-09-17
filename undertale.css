@@ -53,6 +53,7 @@
 }
 
 #joystickBack {
+	touch-action: none;
 	opacity: 20%;
 	width: 25%;
 	position: fixed;
@@ -60,6 +61,7 @@
 }
 
 #confirmButton {
+	touch-action: none;
 	opacity: 50%;
 	width: 25%;
 	position: fixed;
@@ -68,6 +70,7 @@
 }
 
 #backButton {
+	touch-action: none;
 	opacity: 50%;
 	width: 10%;
 	position: fixed;
@@ -76,6 +79,7 @@
 }
 
 #joystick {
+	touch-action: none;
 	opacity: 20%;
 	width: 20%;
 	position: fixed;
@@ -110,7 +114,7 @@ footer, header, hgroup, menu, nav, section {
 	display: block;
 }
 body {
-	touch-action: pan-x pan-y;
+	touch-action: none;
     background-color: black;
 	position: fixed;
 	line-height: 1;
