@@ -13,6 +13,7 @@ var sprites = {};
 var sounds = {}
 var loadIndicator;
 var backButton;
+var playerDamageMultiplier;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -98,6 +99,17 @@ function enemyAttackDone() {
     }
 }
 
+function playerActDone() {
+    for (let x in undertale.battle.enemies) {
+        undertale.battle.enemies[x].attack()
+    }
+    player.drawSoul = true;
+    player.collides = true;
+    player.x = 312
+    player.y = 307
+    battlebox.interpTo(235,220,405,395)
+}
+
 
 function printAt(context, text, x, y, lineHeight, fitWidth)
 {
@@ -180,8 +192,8 @@ function checkKeyUp(e) {
 }
 
 class Tickable {
-    x = 0
-    y = 0
+    x;
+    y;
     prevX = 0;
     prevY = 0;
     priority = 0;
@@ -344,13 +356,22 @@ class Sprite {
     ],
         
     }
-    properties = {
-        "scale": new Vector2(1,1),
-        "color": new Color(1,1,1),
-        "opacity": 1
-    }
+
     constructor(file) {
         this.image = SPR(file)
+        this.properties = {
+            "scale": new Vector2(1,1),
+            "color": new Color(1,1,1),
+            "opacity": 1
+        }
+    }
+
+    setImgProperty(property, value) {
+        this.properties[property] = value;
+    }
+
+    getImgProperty(property) {
+        return this.properties[property]
     }
 
     addAnimation(name, animation) {
@@ -369,23 +390,57 @@ class Sprite {
     }
 
     playAnimation(name, speed = 1, reverse = false) {
-        let time = 33
+        /*let timer = 33 * speed
+        let time = timer;
         setInterval(function() {
             if (time > 0) {
                 time -= 1
+                for ()
+                setImgProperty
+            } else {
+
             }
-        },33)
+        },33)*/
     }
 
     draw(x,y) {
-        //if (this.image.complete) {
+        if (this.image.complete) {
             canvas.drawImage(this.image,x,y);
-        //}
+        }
     }
 
     img(file) {
         this.image = SPR(file)
     }
+}
+
+class SpriteRigBone {
+    x;
+    y;
+    constructor(filepath) {
+        this.sprite = new Sprite(filepath);
+        this.parent = null;
+    }
+
+    movement() {}
+
+    render() {
+        this.sprite.draw()
+    }
+}
+
+class SpriteRig extends Tickable {
+    constructor(bones) {
+
+    }
+    /* Bones Structure
+        {sprite: "filepath", movement: function, child:
+            {
+                sprite: "filepath", movement: function, child: {}}
+            }
+        }
+        And so on.
+    */
 }
 
 class AttackFactory {
@@ -414,14 +469,65 @@ class Enemy extends Tickable {
         this.name = "Enemy"
         this.maxhp = 50;
         this.hp = this.maxhp;
+        this.visualHp = this.maxhp;
+        this.drawHealthBar = false;
+        this.xOffset = 0;
+        this.x = 320;
+        this.disintegrateTime = 0;
+        this.disintegrate = []
+        for (let x = 0; x < 32; x++) {
+            this.disintegrate.push({x: 0, y: x + 64})
+        }
+        this.disintegrating = false;
+    }
+
+    actCheck() {
+
     }
 
     onDamage(damage) {
-        this.hp = this.hp - damage;
+        this.drawHealthBar = true;
+        playSound("snd_damage.wav")
+        let initHp = this.hp;
+        this.hp = this.hp - 25;
+        let time = 0;
+        let curDir = false;
+        setTimeout(function(self = this) {
+            this.drawHealthBar = false;
+        }.bind(this), 1000)
+        let interval = setInterval(function(self = this) {
+            time += 1;
+            this.xOffset = (Math.pow(Math.sin(time),16)) * 16
+
+            this.visualHp = lerp(this.hp, initHp, time / 20)
+            if (time > 20) {
+                clearInterval(interval)
+                if (this.hp <= 0) {
+                    playSound("monsterdust.wav")
+                    this.disintegrating = true;
+                }
+            }
+        }.bind(this),30)
     }
 
     render() {
-        this.sprite.draw(64,64)
+        if (this.disintegrating) {
+            this.disintegrateTime += 3
+            for (let d in this.disintegrate) {
+                this.disintegrate[d].y -= Math.random() * 16
+                canvas.drawImage(this.sprite.image, this.x + ((Math.random() * 128)-64) * (this.disintegrateTime/ 64), 90 + this.disintegrate[d].y + d,(Math.max(108 - this.disintegrateTime, 0)),8)
+            }
+        } else {
+            this.sprite.draw(this.x + this.xOffset,90)
+        }
+        if (this.drawHealthBar) {
+            canvas.fillStyle = 'gray';
+            // base
+            canvas.fillRect(this.x - 16, 90, 128, 16);
+            // actual health
+            canvas.fillStyle = 'lime';
+            canvas.fillRect(this.x - 16, 90, Math.max((128 * this.visualHp / this.maxhp),0), 16);
+        }
     }
 
     attack() {
@@ -620,6 +726,7 @@ class Soul extends Tickable {
     attackProg = 1;
     invincibility = 0;
     drawUi = true;
+    drawSoul = true;
 
     constructor() {
         super();
@@ -718,8 +825,12 @@ class Soul extends Tickable {
         if (e.keyCode == 90 || e.keyCode == 13) { // Z
             if (this.targetSelect) {
                 //undertale.battle.enemies[this.selectedListItem].damage(30)
-                //this.targetSelect = false;
-                //this.attackMenu = true;
+                this.targetSelect = false;
+                this.attackMenu = true;
+                this.drawSoul = false;
+                undertale.spawn(new AttackBar())
+
+                /*
                 
                 for (let x in undertale.battle.enemies) {
                     undertale.battle.enemies[x].attack()
@@ -728,7 +839,7 @@ class Soul extends Tickable {
                 this.x = 312
                 this.y = 307
                 battlebox.interpTo(235,220,405,395)
-                this.targetSelect = false;
+                this.targetSelect = false;*/
             }
 
             if (this.selectMenu || this.fightMenu) {
@@ -815,7 +926,9 @@ class Soul extends Tickable {
     }
 
     render() {
-        this.mode.render()
+        if (this.drawSoul) {
+            this.mode.render()
+        }
         if (this.drawUi) {
         canvas.globalCompositeOperation = "lighter"
         this.fightButton.draw(32,432)
@@ -848,6 +961,71 @@ class Soul extends Tickable {
         }
     }
 
+    }
+}
+
+class AttackBar extends Tickable {
+    constructor(damage) {
+        super()
+        this.damage = damage
+        this.sprite = new Sprite("ui/attackbar");
+        this.indicator = new Sprite("ui/attackbar_indi1")
+        this.progress = 1;
+        this.canPress = false;
+        this.flicker = false;
+        this.curFlicker = false;
+        setTimeout(function(self = this) {
+            self.canPress = true;
+        }.bind(this),20)
+        this.moving = true;
+    }
+
+    keyPressed(e) {
+        if (this.canPress) {
+            if (e.keyCode == 90 || e.keyCode == 13) { // Z
+                this.canPress = false;
+                playerDamageMultiplier = -Math.abs((2 * this.progress) - 1) + 1;
+                this.moving = false;
+                this.flicker = true;
+                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage * playerDamageMultiplier)
+                setTimeout(function(self = this) {
+                    this.destroy()
+                    let allDead = true;
+                    for (let x in undertale.battle.enemies) {
+                        if (undertale.battle.enemies[x].hp > 0) {
+                            allDead = false;
+                        }
+                    }
+                    if (allDead) {
+                        SND(undertale.battle.music).pause()
+                        textbox.show()
+                        textbox.setMessage("YOU WON! You earned... nothing?")
+                    } else {
+                        playerActDone();
+                    }
+                }.bind(this), 500)
+            }
+        }
+    }
+
+    tick() {
+        this.curFlicker = !this.curFlicker;
+        if (this.moving) {
+            if (this.progress > 0) {
+                this.progress -= .02;
+            } else {
+                this.destroy()
+                playerActDone();
+            }
+        }
+    }
+
+    render() {
+        if (this.flicker) {
+            this.indicator.img(this.curFlicker ? "ui/attackbar_indi1" : "ui/attackbar_indi2")
+        }
+        this.sprite.draw(48,260)
+        this.indicator.draw(lerp(600,32,this.progress),253)
     }
 }
 
@@ -961,9 +1139,9 @@ class TypingText extends Tickable {
     }
 
     setMessage(message) {
+        this.message = message;
         this.curMessage = ""
         this.curLetter = 0;
-        this.message = message;
     }
 
     render() {
@@ -998,7 +1176,7 @@ class Undertale {
     tickables = []
     collision = []
     constructor() {
-        this.battle = new Battle(new SoulMode(), [new Enemy(), new Enemy()]);
+        this.battle = new Battle(new SoulMode(), [new Enemy()]);
         playSound(this.battle.music, true)
         for (let x in this.battle.enemies) {
             this.spawn(this.battle.enemies[x]);
@@ -1029,6 +1207,8 @@ window.addEventListener('load', function() {
         "soul_dead",
         "soul_shard",
         "soul",
+        "ui/attackbar_indi1",
+        "ui/attackbar_indi2"
     ], spritesLoaded)
 
     function spritesLoaded() {
@@ -1040,7 +1220,9 @@ window.addEventListener('load', function() {
             "snd_heartshot.wav",
             "snd_select.wav",
             "snd_squeak.wav",
-            "SND_TXT2.wav"
+            "SND_TXT2.wav",
+            "snd_damage.wav",
+            "monsterdust.wav"
         ], audioLoaded)
     }
 
