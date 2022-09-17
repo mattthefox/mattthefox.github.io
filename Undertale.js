@@ -364,6 +364,12 @@ class Sprite {
             "color": new Color(1,1,1),
             "opacity": 1
         }
+        this.disintegrateTime = 0;
+        this.disintegrate = []
+        for (let x = 0; x < this.image.naturalHeight; x++) {
+            this.disintegrate.push({y: (x * .1) + 32})
+        }
+        this.disintegrating = false;
     }
 
     setImgProperty(property, value) {
@@ -405,7 +411,15 @@ class Sprite {
 
     draw(x,y) {
         if (this.image.complete) {
-            canvas.drawImage(this.image,x,y);
+            if (this.disintegrating) {
+                this.disintegrateTime += 1.5
+                for (let d in this.disintegrate) {
+                    this.disintegrate[d].y -= Math.random() * 4
+                    canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(128 - (this.disintegrateTime * 4), 0)),2)
+                }
+            } else {
+                canvas.drawImage(this.image,x,y);
+            }
         }
     }
 
@@ -472,13 +486,8 @@ class Enemy extends Tickable {
         this.visualHp = this.maxhp;
         this.drawHealthBar = false;
         this.xOffset = 0;
-        this.x = 320;
-        this.disintegrateTime = 0;
-        this.disintegrate = []
-        for (let x = 0; x < 32; x++) {
-            this.disintegrate.push({x: 0, y: x + 64})
-        }
-        this.disintegrating = false;
+        this.x = 0;
+        this.y = -32;
     }
 
     actCheck() {
@@ -504,22 +513,14 @@ class Enemy extends Tickable {
                 clearInterval(interval)
                 if (this.hp <= 0) {
                     playSound("monsterdust.wav")
-                    this.disintegrating = true;
+                    this.sprite.disintegrating = true;
                 }
             }
         }.bind(this),30)
     }
 
     render() {
-        if (this.disintegrating) {
-            this.disintegrateTime += 3
-            for (let d in this.disintegrate) {
-                this.disintegrate[d].y -= Math.random() * 16
-                canvas.drawImage(this.sprite.image, this.x + ((Math.random() * 128)-64) * (this.disintegrateTime/ 64), 90 + this.disintegrate[d].y + d,(Math.max(108 - this.disintegrateTime, 0)),8)
-            }
-        } else {
-            this.sprite.draw(this.x + this.xOffset,90)
-        }
+        this.sprite.draw(this.x + this.xOffset,90)
         if (this.drawHealthBar) {
             canvas.fillStyle = 'gray';
             // base
