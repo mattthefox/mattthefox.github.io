@@ -3,11 +3,6 @@
    License: none (public domain)
 */
 
-body {
-    background-color: black;
-	position: fixed;
-}
-
 #loadIndicator {
 	width: 50px;
 }
@@ -115,6 +110,9 @@ footer, header, hgroup, menu, nav, section {
 	display: block;
 }
 body {
+	touch-action: pan-x pan-y;
+    background-color: black;
+	position: fixed;
 	line-height: 1;
 	height: 100%;
    	overflow-y: hidden
