@@ -14,6 +14,7 @@ var sounds = {}
 var loadIndicator;
 var backButton;
 var playerDamageMultiplier;
+var globalTime;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -41,6 +42,15 @@ function audioLoop(paths, index, callback) {
             callback();
         }
     //}
+}
+
+Number.prototype.inRange = function(min, max, inclusive = true) {
+    console.log(this)
+    if (inclusive) {
+        return (this >= min && this <= max)
+    } else {
+        return (this > min && this < max)
+    }
 }
 
 function spriteLoop(paths, index, callback) {
@@ -78,6 +88,21 @@ function playSound(path, loop = false) {
     sounds[file].loop = loop;
 }
 
+function chooseFlavorText() {
+    let aliveEnemies = [];
+    for (let x in undertale.battle.enemies) {
+        if (undertale.battle.enemies[x].hp > 0 || undertale.battle.enemies[x].mercy < 100) {
+            aliveEnemies.push(undertale.battle.enemies[x]);
+        }
+    }
+    console.log(aliveEnemies)
+
+    let randomEnemy = aliveEnemies[(Math.round(Math.random() * (aliveEnemies.length-1)))]
+    let randomFlavor = randomEnemy.flavorTexts[Math.round(Math.random() * (randomEnemy.flavorTexts.length-1))]
+    textbox.show()
+    textbox.setMessage(randomFlavor)
+}
+
 function enemyAttackDone() {
     if (!player.death) {
         battlebox.interpTo(32,250,607,385,8);
@@ -85,6 +110,8 @@ function enemyAttackDone() {
         player.death = false;
         player.selectMenu = true;
         player.targetSelect = false;
+        player.actTargetSelect = false;
+        player.actMenu = false;
         player.fightMenu = false;
         player.selectedListItem = 0;
         player.attackMenu = false;
@@ -97,6 +124,8 @@ function enemyAttackDone() {
             undertale.tickables[x].destroy()
         }
     }
+    chooseFlavorText();
+
 }
 
 function playerActDone() {
@@ -111,27 +140,17 @@ function playerActDone() {
 }
 
 
-function printAt(context, text, x, y, lineHeight, fitWidth)
+function printAt(context, text, x, y)
 {
-    fitWidth = fitWidth || 0;
-    
-    if (fitWidth <= 0)
-    {
-         context.fillText( text, x, y );
-        return;
-    }
-    
-    for (var idx = 1; idx <= text.length; idx++)
-    {
-        var str = text.substr(0, idx);
-        if (context.measureText(str).width > fitWidth)
-        {
-            context.fillText( text.substr(0, idx-1), x, y );
-            printAt(context, text.substr(idx-1), x, y + lineHeight, lineHeight,  fitWidth);
-            return;
+    let splits = text.split("\n");
+    for (let g in splits) {
+        let text = splits[g]
+        if (splits[g].startsWith("*")) {
+            text = text.slice(1)
+            context.fillText("*", x - 32, y+ (g * 32))
         }
+        context.fillText(text, x, y + (g * 32));
     }
-    context.fillText( text, x, y );
 }
 
 var fontLoaded = false;
@@ -275,6 +294,43 @@ class Tickable {
     }
 }
 
+class Item {
+    constructor(name, func) {
+        this.name = name;
+        this.func = func;
+    }
+
+    showMessage(message) {
+        textbox.show();
+        textbox.setMessage(message);
+        textbox.confirmed = function() {
+            textbox.hide();
+            playerActDone;
+        }
+    }
+}
+
+class BasicHealingItem {
+    constructor(name, hp, message) {
+        this.name = name;
+        this.hp = hp;
+        this.message = message;
+    }
+
+    onUse() {
+        player.hp = Math.min(player.hp + this.hp,player.maxHp);
+        if (player.hp >+ player.maxHp) {
+            this.message += "\n*Your HP were maxed out."
+        } else {
+            this.message += "\n*You restored "+(this.hp)+" HP."
+        }
+        this.showMessage(this.message)
+    }
+}
+
+const Glamburger = new BasicHealingItem("Glamburger", 28, "Fabulous!")
+const Glamburger = new BasicHealingItem("Glamburger", 28, "Fabulous!")
+
 class Collision {
     constructor(x,y,x1,y1,blocking = true, inner = true) {
         this.x = x;
@@ -321,96 +377,27 @@ class Sprite {
     image;
     loaded = false;
     prevLoaded = false;
-    animation = {
-    "scaleInH": [
-        {"time":0, data: [
-            {"property": "scale", "value": new Vector2(0,1)}
-        ]},
-        {"time":1, data: [
-            {"property": "scale", "value": new Vector2(1,1)}
-        ]},
-    ],
-    "scaleInV": [
-        {"time":0, data: [
-            {"property": "scale", "value": new Vector2(1,0)}
-        ]},
-        {"time":1, data: [
-            {"property": "scale", "value": new Vector2(1,1)}
-        ]},
-    ],
-    "scaleInHV": [
-        {"time":0, data: [
-            {"property": "scale", "value": new Vector2(0,0)}
-        ]},
-        {"time":1, data: [
-            {"property": "scale", "value": new Vector2(1,1)}
-        ]},
-    ],
-    "fade": [
-        {"time":0, data: [
-            {"property": "scale", "value": new Vector2(0,0)}
-        ]},
-        {"time":1, data: [
-            {"property": "scale", "value": new Vector2(1,1)}
-        ]},
-    ],
-        
-    }
 
-    constructor(file) {
+    constructor(file, num = 1) {
+        this.num = num;
         this.image = SPR(file)
-        this.properties = {
-            "scale": new Vector2(1,1),
-            "color": new Color(1,1,1),
-            "opacity": 1
-        }
         this.disintegrateTime = 0;
         this.disintegrate = []
         for (let x = 0; x < this.image.naturalHeight; x++) {
             this.disintegrate.push({y: (x * .1) + 32})
         }
         this.disintegrating = false;
+        this.brightness = 100;
     }
 
-    setImgProperty(property, value) {
-        this.properties[property] = value;
-    }
+    draw(x = 0,y = 0,frame = 0,rotation = 0, origin = new Vector2(0.5,0.5)) {
+        let localOrigin = new Vector2(origin.x * this.image.naturalWidth, origin.y * this.image.naturalHeight)
+        canvas.translate(localOrigin.x, localOrigin.y);
+        canvas.rotate((Math.PI / 180) * rotation);
+        canvas.translate(-localOrigin.x, -localOrigin.y);
 
-    getImgProperty(property) {
-        return this.properties[property]
-    }
-
-    addAnimation(name, animation) {
-        /* Animation Format
-        [
-            {"time":0, data: [
-                {"property": "scale", "value": new Vector2(0,1)}
-            ]},
-            {"time":1, data: [
-                {"property": "scale", "value": new Vector2(1,1)}
-            ]},
-        ]
-        */
-
-        animation[name] = animation;
-    }
-
-    playAnimation(name, speed = 1, reverse = false) {
-        /*let timer = 33 * speed
-        let time = timer;
-        setInterval(function() {
-            if (time > 0) {
-                time -= 1
-                for ()
-                setImgProperty
-            } else {
-
-            }
-        },33)*/
-    }
-
-    draw(x,y) {
         if (this.image.complete) {
+            let w = this.image.naturalWidth / this.num
             if (this.disintegrating) {
                 this.disintegrateTime += 1.5
                 for (let d in this.disintegrate) {
@@ -418,43 +405,19 @@ class Sprite {
                     canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(128 - (this.disintegrateTime * 4), 0)),2)
                 }
             } else {
-                canvas.drawImage(this.image,x,y);
+                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
             }
         }
+
+        canvas.fillStyle = "rgba(0,0,0,"+(1-(this.brightness / 100))+")"
+        canvas.fillRect(x,y,this.image.naturalWidth / this.num,this.image.naturalHeight)
+        canvas.rotate((Math.PI / 180) * -rotation);
+        canvas.fillStyle = "white"
     }
 
     img(file) {
         this.image = SPR(file)
     }
-}
-
-class SpriteRigBone {
-    x;
-    y;
-    constructor(filepath) {
-        this.sprite = new Sprite(filepath);
-        this.parent = null;
-    }
-
-    movement() {}
-
-    render() {
-        this.sprite.draw()
-    }
-}
-
-class SpriteRig extends Tickable {
-    constructor(bones) {
-
-    }
-    /* Bones Structure
-        {sprite: "filepath", movement: function, child:
-            {
-                sprite: "filepath", movement: function, child: {}}
-            }
-        }
-        And so on.
-    */
 }
 
 class AttackFactory {
@@ -475,30 +438,113 @@ class AttackFactory {
     }
 }
 
+function basicTextAct(enemy, message, mercyCounter = 0) {
+    textbox.show();
+    textbox.setMessage(message);
+    textbox.confirmed = function() {
+        if (mercyCounter != 0) {
+            enemy.addMercy(mercyCounter);
+        }
+        playerActDone();
+        textbox.hide();
+    }
+}
+
 class Enemy extends Tickable {
-    constructor(sprite = new Sprite("enemy/dummy")) {
+    mercy = 0;
+    maxHp = 50;
+    name = "Enemy"
+    acts = [
+        {"name": "Check", "func": this.actCheck},
+        {"name": "Beg", "func": this.actBeg}
+    ]
+    flavorTexts = [
+        "The enemy is malfunctioning.",
+        "The enemy wants to attack\nyou... I think?",
+        "The enemy is wondering why\nit's a placeholder.",
+        "The enemy wishes it could be\nin Deltarune instead.",
+        "The enemy is unimpressed with\nthe developer.",
+        "The enemy wishes it had a\nremotely challenging attack."
+    ]
+    description = "It's an enemy. Wow."
+    sprite = new Sprite("enemy/dummy");
+    x = 0;
+    y = -32;
+    frameNorm = 0;
+    frameSpareDeath = 0;
+
+    constructor() {
         super()
-        this.sprite = sprite;
         this.priority = 5;
-        this.name = "Enemy"
-        this.maxhp = 50;
         this.hp = this.maxhp;
+        this.visualMercy = this.mercy;
         this.visualHp = this.maxhp;
         this.drawHealthBar = false;
+        this.drawMercyBar = false;
         this.xOffset = 0;
-        this.x = 0;
-        this.y = -32;
+        this.spared = false;
+        this.textY = 0;
+        this.mercyGain = 0;
+        this.frame = this.frameNorm;
     }
 
-    actCheck() {
+    actCheck(self) {
+        textbox.show();
+        textbox.setMessage(self.description);
+        textbox.confirmed = function() {
+            playerActDone();
+            textbox.hide();
+        }
+    }
 
+    actBeg(self) {
+        if (self.mercy.inRange(0,24)) {
+            basicTextAct(self,"You begged the enemy to make a\nbetter attack.\n*It's listening...", 25);
+            self.acts.push({"name":"Assist", "func": self.actAssist})
+        } else {
+            basicTextAct(self, "For some reason, you keep begging\nthe enemy.\n*It think you're a real a nutcase!")
+        }
+    }
+
+    actAssist(self) {
+        if (self.mercy.inRange(25, 49, true)) {
+            basicTextAct(self,"You gave the enemy some ideas for\nan attack.", 25);
+        } else if (self.mercy < 100) {
+            basicTextAct(self,"You keep giving it ideas. You're\nspeaking so fast it can't even\nunderstand!",50);
+        } else {
+            basicTextAct(self,"The enemy gets your point by now...")
+        }
+    }
+
+    addMercy(amount) {
+        // @todo MERCY: draw amount of damage, play sound after adding an amount of mercy.
+        playSound("snd_select.wav")
+        this.mercyGain = amount;
+        this.drawMercyBar = true;
+        let initMercy = this.mercy;
+        this.mercy += amount;
+        let time = 0;
+        let interval = setInterval(function(self = this) {
+            playSound("snd_squeak.wav")
+            self.visualMercy = lerp(self.mercy, initMercy, time / 20)
+            time += 1;
+            this.textY += 1;
+            if (time > 20) {
+                clearInterval(interval)
+            }
+        }.bind(this),30)
+        setTimeout(function(self = this) {
+            self.drawMercyBar = false;
+        }.bind(this), 2000)
     }
 
     onDamage(damage) {
+        // @todo FIGHT: draw amount of damage after being struck.
+        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
         this.drawHealthBar = true;
         playSound("snd_damage.wav")
         let initHp = this.hp;
-        this.hp = this.hp - 25;
+        this.hp = this.hp - damage;
         let time = 0;
         let curDir = false;
         setTimeout(function(self = this) {
@@ -519,8 +565,19 @@ class Enemy extends Tickable {
         }.bind(this),30)
     }
 
+    spare() {
+        this.spared = true;
+        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+        this.frame = this.frameSpareDeath;
+        this.sprite.brightness = 50;
+        let dust = new SpareDust();
+        dust.x = this.x;
+        dust.y = this.y;
+        undertale.spawn(dust);
+    }
+
     render() {
-        this.sprite.draw(this.x + this.xOffset,90)
+        this.sprite.draw(this.x + this.xOffset,90,this.frame)
         if (this.drawHealthBar) {
             canvas.fillStyle = 'gray';
             // base
@@ -528,6 +585,15 @@ class Enemy extends Tickable {
             // actual health
             canvas.fillStyle = 'lime';
             canvas.fillRect(this.x - 16, 90, Math.max((128 * this.visualHp / this.maxhp),0), 16);
+        }
+        if (this.drawMercyBar) {
+            canvas.fillStyle = 'gray';
+            // base
+            canvas.fillRect(this.x - 16, 90, 128, 16);
+            // actual health
+            canvas.fillStyle = 'yellow';
+            canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualMercy / 100)),0), 16);
+            canvas.fillText("+"+this.mercyGain+"%", this.x+32, 80 - this.textY)
         }
     }
 
@@ -541,6 +607,30 @@ class Enemy extends Tickable {
                 new Bullet("soul",320+(x*16),240,5,function(){this.y += 2})
             }
         },3)
+    }
+}
+
+class SpareDust extends Tickable {
+    constructor() {
+        super()
+        // @todo import smoke sprites, finish this
+        this.smoke = new Sprite("ui/ut_smoke")
+        this.move = 0; 
+    }
+
+    tick() {
+        this.move += 1;
+        if (this.move > 40) {
+            this.destroy();
+        }
+    }
+
+    render() {
+        let m = Math.min(this.move,20)
+        this.smoke.draw(this.x - m,this.y - m)
+        this.smoke.draw(this.x - m,this.y + m)
+        this.smoke.draw(this.x + m,this.y - m)
+        this.smoke.draw(this.x + m,this.y + m)
     }
 }
 
@@ -720,7 +810,9 @@ class Soul extends Tickable {
     death = false;
     selectMenu = true;
     targetSelect = false;
+    actTargetSelect = false;
     fightMenu = false;
+    actMenu = false;
     selectedListItem = 0;
     attackMenu = false;
     listLength = 0;
@@ -728,6 +820,7 @@ class Soul extends Tickable {
     invincibility = 0;
     drawUi = true;
     drawSoul = true;
+    selectedActTarget = 0;
 
     constructor() {
         super();
@@ -757,7 +850,7 @@ class Soul extends Tickable {
             this.x = 40 + (this.selectedAct * 156)
             this.y = 445
         }
-        if (this.targetSelect) {
+        if (this.targetSelect || this.actTargetSelect || this.actMenu) {
             this.x = 55
             this.y = 278 + this.selectedListItem * 32
         }
@@ -825,25 +918,28 @@ class Soul extends Tickable {
         let v = 0;
         if (e.keyCode == 90 || e.keyCode == 13) { // Z
             if (this.targetSelect) {
-                //undertale.battle.enemies[this.selectedListItem].damage(30)
                 this.targetSelect = false;
                 this.attackMenu = true;
                 this.drawSoul = false;
                 undertale.spawn(new AttackBar())
-
-                /*
-                
-                for (let x in undertale.battle.enemies) {
-                    undertale.battle.enemies[x].attack()
+            } else if (this.actTargetSelect) {
+                this.selectedActTarget = this.selectedListItem;
+                this.actTargetSelect = false;
+                this.actMenu = true;
+                this.list = []
+                for (let o in undertale.battle.enemies[this.selectedActTarget].acts) {
+                    let e = undertale.battle.enemies[this.selectedActTarget].acts;
+                    this.list.push(e[o].name);
                 }
-                this.collides = true;
-                this.x = 312
-                this.y = 307
-                battlebox.interpTo(235,220,405,395)
-                this.targetSelect = false;*/
+            } else if (this.actMenu) {
+                this.targetSelect = false;
+                this.actMenu = false;
+                this.drawSoul = false;
+                let e = undertale.battle.enemies[this.selectedActTarget]
+                e.acts[this.selectedListItem].func(e);
             }
 
-            if (this.selectMenu || this.fightMenu) {
+            if (this.selectMenu || this.fightMenu || this.actTargetSelect || this.actMenu) {
                 playSound("snd_select.wav");
             }
             if (this.selectMenu) {
@@ -859,15 +955,63 @@ class Soul extends Tickable {
                         this.listLength = undertale.battle.enemies.length
                         textbox.hide();
                     break;
+
+                    case 1: // act
+                        this.selectedListItem = 0;
+                        this.actTargetSelect = true;
+                        this.list = []
+                        textbox.hide();
+                        for (let x in undertale.battle.enemies) {
+                            this.list.push(undertale.battle.enemies[x].name)
+                        }
+                    break;
+
+                    case 3: // Spare
+                        let foundOne = false;
+                        for (let x in undertale.battle.enemies) {
+                            if (undertale.battle.enemies[x].mercy >= 100) {
+                                foundOne = true;
+                                undertale.battle.enemies[x].spare();
+                            }
+                        }
+                        if (!foundOne) {
+                            textbox.show();
+                            textbox.setMessage("But nobody's names were yellow...")
+                            textbox.confirmed = function() {
+                                textbox.hide();
+                                this.selectMenu = true;
+                            }
+                        } else {
+                            setTimeout(function() {
+                                if (!undertale.battle.winCheck) {
+                                    playerActDone();
+                                }
+                            },1000)
+                        }
+                    break;
                 }
             }
         }
 
         if (e.keyCode == 88 || e.keyCode == 16) {
-            if (this.targetSelect) {
+            if (this.targetSelect || this.actTargetSelect) {
                 this.targetSelect = false;
+                this.actTargetSelect = false;
                 this.selectMenu = true;
+                this.actMenu = false;
                 textbox.show()
+                chooseFlavorText();
+            }
+            if (this.actMenu) {
+                this.actMenu = false;
+                this.actTargetSelect = true;
+                this.selectedListItem = 0;
+                this.actTargetSelect = true;
+                this.list = []
+                textbox.hide();
+                for (let x in undertale.battle.enemies) {
+                    this.list.push(undertale.battle.enemies[x].name)
+                }
             }
         }
 
@@ -884,10 +1028,10 @@ class Soul extends Tickable {
            h = 1
         }
 
-        if (this.targetSelect) {
+        if (this.targetSelect || this.actTargetSelect || this.actMenu) {
             if (v != 0) {
                 playSound("snd_squeak.wav")
-                this.selectedListItem = clamp(this.selectedListItem + v,0,this.listLength - 1)
+                this.selectedListItem = clamp(this.selectedListItem + v,0,this.list.length - 1)
             }
         }
 
@@ -955,9 +1099,15 @@ class Soul extends Tickable {
         this.battleSlash.draw(358,406)
         canvas.font = "32px utFont";
 
-        if (this.targetSelect) {
+        if (this.targetSelect || this.actMenu || this.actTargetSelect) {
             for (let x in this.list) {
+                if (this.actTargetSelect || this.targetSelect) {
+                    if (undertale.battle.enemies[x].mercy >= 100) {
+                        canvas.fillStyle = "yellow"
+                    }
+                }
                 canvas.fillText("*  "+this.list[x],84,294 + x * 32)
+                canvas.fillStyle = "white"
             }
         }
     }
@@ -991,17 +1141,7 @@ class AttackBar extends Tickable {
                 undertale.battle.enemies[player.selectedListItem].onDamage(this.damage * playerDamageMultiplier)
                 setTimeout(function(self = this) {
                     this.destroy()
-                    let allDead = true;
-                    for (let x in undertale.battle.enemies) {
-                        if (undertale.battle.enemies[x].hp > 0) {
-                            allDead = false;
-                        }
-                    }
-                    if (allDead) {
-                        SND(undertale.battle.music).pause()
-                        textbox.show()
-                        textbox.setMessage("YOU WON! You earned... nothing?")
-                    } else {
+                    if (!undertale.battle.winCheck) {
                         playerActDone();
                     }
                 }.bind(this), 500)
@@ -1120,7 +1260,7 @@ class TypingText extends Tickable {
 
     init() {
         setInterval(function(self = this) {
-            if (self.curLetter < this.message.length) {
+            if (self.curLetter < self.message.length) {
                 self.curMessage = self.curMessage + self.message.charAt(self.curLetter);
                 playSound("SND_TXT2.wav")
                 self.curLetter += 1;
@@ -1128,11 +1268,30 @@ class TypingText extends Tickable {
         }.bind(this),50)
     }
 
+    end() {
+        this.confirmed = function() {}
+    }
+
+    keyPressed(e) {
+        if (e.keyCode == 90 || e.keyCode == 13) { // Z
+            if (this.curLetter >= this.message.length) {
+                this.confirmed();
+            }
+        } else
+        if (e.keyCode == 88 || e.keyCode == 16) {
+            this.curLetter = this.message.length
+            this.curMessage = this.message;
+        }
+    }
+
+    confirmed() {}
+
     hide() {
         this.prevMessage = this.message;
         this.message = ""
         this.curMessage = ""
         this.curLetter = 0;
+        this.end();
     }
 
     show() {
@@ -1140,6 +1299,7 @@ class TypingText extends Tickable {
     }
 
     setMessage(message) {
+        this.prevMessage = message;
         this.message = message;
         this.curMessage = ""
         this.curLetter = 0;
@@ -1154,6 +1314,39 @@ class TypingText extends Tickable {
         var ctext = this.curMessage.replace(/ /g,"   ")
         printAt(canvas,ctext,84,294,32,484)
     }
+}
+
+class TextBubble extends Tickable {
+    constructor(message, confirmable) {
+        super()
+        this.message = message;
+        this.curLetter = 0;
+        this.curMessage = ""
+        this.prevMessage = message;
+        setInterval(function(self = this) {
+            if (self.curLetter < self.message.length) {
+                self.curMessage = self.curMessage + self.message.charAt(self.curLetter);
+                self.curLetter += 1;
+            }
+        }.bind(this),50)
+    }
+
+    confirmed() {}
+
+    keyPressed(e) {
+        if (e.keyCode == 90 || e.keyCode == 13) { // Z
+            if (this.curLetter >= this.message.length) {
+                this.destroy();
+                this.confirmed();
+            }
+        } else if (e.keyCode == 88 || e.keyCode == 16) {
+            this.curLetter = this.message.length
+            this.curMessage = this.message;
+        }
+    }
+
+
+
 }
 
 class BattleGimmick {
@@ -1171,6 +1364,22 @@ class Battle {
         this.love = love;
         this.music = music;
     }
+
+    winCheck() {
+        for (let x in this.enemies) {
+            if (this.enemies[x].hp > 0 || this.enemies[x].spared) {
+                allDead = false;
+            }
+        }
+        if (allDead) {
+            SND(this.music).pause()
+            textbox.show()
+            textbox.setMessage("YOU WON! You earned... nothing?")
+            return true;
+        } else {
+            return false;
+        }
+    } 
 }
 
 class Undertale {
@@ -1188,6 +1397,7 @@ class Undertale {
         this.tickables.push(actor);
         actor.init();
         this.tickables.sort((a, b) => (a.priority - b.priority))
+        return actor;
     }
 }
     
@@ -1195,6 +1405,7 @@ window.addEventListener('load', function() {
     loadIndicator = document.getElementById("loadIndicator");
     loadSprites([
         "enemy/dummy",
+        "ui/ut_smoke",
         "ui/_act",
         "ui/act",
         "ui/_fight",
@@ -1225,6 +1436,10 @@ window.addEventListener('load', function() {
             "snd_damage.wav",
             "monsterdust.wav"
         ], audioLoaded)
+    }
+
+    function lol() {
+
     }
 
     function audioLoaded() {
@@ -1365,6 +1580,7 @@ window.addEventListener('load', function() {
     canvas.imageSmoothingQuality = "low"
     undertale = new Undertale();
     setInterval(function() {
+        globalTime += .5;
         for (let m in undertale.tickables) {
             undertale.tickables[m].beginTick();
             undertale.tickables[m].tick();
@@ -1394,7 +1610,8 @@ window.addEventListener('load', function() {
     undertale.spawn(player)
     battlebox = new BattleBox()
     undertale.spawn(battlebox)
-    textbox = new TypingText("I am test mr test. For real!!!!")
+    textbox = new TypingText("")
+    chooseFlavorText();
     undertale.spawn(textbox)
     //battlebox.interpTo(250,220,400,395)
 }
