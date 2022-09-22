@@ -14,7 +14,7 @@ var sounds = {}
 var loadIndicator;
 var backButton;
 var playerDamageMultiplier;
-var globalTime;
+var globalTime = 0;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -120,7 +120,7 @@ function enemyAttackDone() {
         textbox.show()
     }
     for (let x in undertale.tickables) {
-        if (undertale.tickables[x] instanceof Bullet) {
+        if (undertale.tickables[x].prototype instanceof Bullet || undertale.tickables[x].prototype === Bullet) {
             undertale.tickables[x].destroy()
         }
     }
@@ -211,14 +211,14 @@ function checkKeyUp(e) {
 }
 
 class Tickable {
-    x;
-    y;
+    x = 0;
+    y = 0;
     prevX = 0;
     prevY = 0;
     priority = 0;
     sprite;
     collides = true;
-    constructor(x, y, sprite = new Sprite("soul")) {
+    constructor(sprite = new Sprite("soul")) {
         this.sprite = sprite;
         this.collision = new Collision()
     }
@@ -281,13 +281,6 @@ class Tickable {
                         }
                     
                 }
-                /*
-                if (this.y > c.y && this.y < c.y1) {
-                    if (c.blocking) {
-                        this.y += (this.prevY-this.y);
-                    }
-                    c.onTouch(this);
-                }*/
             }
             }
         }
@@ -295,8 +288,9 @@ class Tickable {
 }
 
 class Item {
-    constructor(name, func) {
+    constructor(name, seriousModeName, func) {
         this.name = name;
+        this.seriousModeName = this.name;
         this.func = func;
     }
 
@@ -328,8 +322,8 @@ class BasicHealingItem {
     }
 }
 
-const Glamburger = new BasicHealingItem("Glamburger", 28, "Fabulous!")
-const Glamburger = new BasicHealingItem("Glamburger", 28, "Fabulous!")
+const CinnaBun = new BasicHealingItem("CinnaBun","C. Bun.", 10, "Spicy.")
+const Glamburger = new BasicHealingItem("Glamburg", "Burger", 28, "Fabulous!")
 
 class Collision {
     constructor(x,y,x1,y1,blocking = true, inner = true) {
@@ -399,6 +393,10 @@ class Sprite {
         if (this.image.complete) {
             let w = this.image.naturalWidth / this.num
             if (this.disintegrating) {
+                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
+                // Fade out while it disintegrates
+                canvas.fillStyle = "rgba(0,0,0,"+Math.max(30 / this.disintegrateTime,0)+")"
+                canvas.fillRect(x,y,this.image.naturalWidth / this.num, this.naturalHeight)
                 this.disintegrateTime += 1.5
                 for (let d in this.disintegrate) {
                     this.disintegrate[d].y -= Math.random() * 4
@@ -467,16 +465,17 @@ class Enemy extends Tickable {
         "The enemy wishes it had a\nremotely challenging attack."
     ]
     description = "It's an enemy. Wow."
-    sprite = new Sprite("enemy/dummy");
-    x = 0;
-    y = -32;
+    face = new Sprite("enemy/froggit_face",2);
+    body = new Sprite('enemy/froggit_body',2)
+    x = 128;
+    y = 64;
     frameNorm = 0;
-    frameSpareDeath = 0;
+    frameSpareDeath = 1;
 
     constructor() {
         super()
         this.priority = 5;
-        this.hp = this.maxhp;
+        this.hp = this.maxHp;
         this.visualMercy = this.mercy;
         this.visualHp = this.maxhp;
         this.drawHealthBar = false;
@@ -486,6 +485,7 @@ class Enemy extends Tickable {
         this.textY = 0;
         this.mercyGain = 0;
         this.frame = this.frameNorm;
+        this.collides = false;
     }
 
     actCheck(self) {
@@ -538,13 +538,23 @@ class Enemy extends Tickable {
         }.bind(this), 2000)
     }
 
+    hurtAnimation(undo) {
+        if (!undo) {
+            this.frame = this.frameSpareDeath;
+        } else {
+            this.frame = this.frameNorm;
+        }
+    }
+
     onDamage(damage) {
+        console.log(damage)
         // @todo FIGHT: draw amount of damage after being struck.
-        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+        //undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+        this.hurtAnimation(false)
         this.drawHealthBar = true;
         playSound("snd_damage.wav")
         let initHp = this.hp;
-        this.hp = this.hp - damage;
+        this.hp = this.hp - 25;
         let time = 0;
         let curDir = false;
         setTimeout(function(self = this) {
@@ -557,34 +567,54 @@ class Enemy extends Tickable {
             this.visualHp = lerp(this.hp, initHp, time / 20)
             if (time > 20) {
                 clearInterval(interval)
+                this.hurtAnimation(true)
                 if (this.hp <= 0) {
-                    playSound("monsterdust.wav")
-                    this.sprite.disintegrating = true;
+                    undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+                    this.deathAnimation();
+                }
+                if (!undertale.battle.winCheck()) {
+                    playerActDone()
                 }
             }
         }.bind(this),30)
     }
 
-    spare() {
-        this.spared = true;
-        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+    deathAnimation() {
+        playSound("monsterdust.wav")
+        this.face.disintegrating = true;
+        this.body.disintegrating = true;
+    }
+
+    spareAnimation() {
         this.frame = this.frameSpareDeath;
-        this.sprite.brightness = 50;
-        let dust = new SpareDust();
-        dust.x = this.x;
-        dust.y = this.y;
+        this.body.brightness = 50;
+        this.face.brightness = 50;
+
+        let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
         undertale.spawn(dust);
     }
 
+    spare() {
+        this.spared = true;
+        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+        this.spareAnimation();
+    }
+
+    deferredRender() {
+        this.face.draw(this.x + this.xOffset + Math.sin(globalTime * .1) * 5,this.y + Math.sin(globalTime * .2) * 2,this.frame)
+        this.body.draw(this.x + this.xOffset * 2,this.y + 64,this.frame)
+    }
+
     render() {
-        this.sprite.draw(this.x + this.xOffset,90,this.frame)
+        this.deferredRender();
         if (this.drawHealthBar) {
+            console.log(this.visualHp)
             canvas.fillStyle = 'gray';
             // base
             canvas.fillRect(this.x - 16, 90, 128, 16);
             // actual health
             canvas.fillStyle = 'lime';
-            canvas.fillRect(this.x - 16, 90, Math.max((128 * this.visualHp / this.maxhp),0), 16);
+            canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualHp / this.maxhp)),0), 16);
         }
         if (this.drawMercyBar) {
             canvas.fillStyle = 'gray';
@@ -611,22 +641,28 @@ class Enemy extends Tickable {
 }
 
 class SpareDust extends Tickable {
-    constructor() {
+    x;
+    y;
+    constructor(x,y) {
         super()
         // @todo import smoke sprites, finish this
         this.smoke = new Sprite("ui/ut_smoke")
         this.move = 0; 
+        this.priority = 19;
+        this.x = x;
+        this.y = y;
+        this.collides = false;
     }
 
     tick() {
         this.move += 1;
-        if (this.move > 40) {
+        if (this.move > 8) {
             this.destroy();
         }
     }
 
     render() {
-        let m = Math.min(this.move,20)
+        let m = Math.min(this.move * 6,40)
         this.smoke.draw(this.x - m,this.y - m)
         this.smoke.draw(this.x - m,this.y + m)
         this.smoke.draw(this.x + m,this.y - m)
@@ -921,7 +957,7 @@ class Soul extends Tickable {
                 this.targetSelect = false;
                 this.attackMenu = true;
                 this.drawSoul = false;
-                undertale.spawn(new AttackBar())
+                undertale.spawn(new AttackBar(5 + ((undertale.battle.love-1) * 56)))
             } else if (this.actTargetSelect) {
                 this.selectedActTarget = this.selectedListItem;
                 this.actTargetSelect = false;
@@ -1118,7 +1154,7 @@ class Soul extends Tickable {
 class AttackBar extends Tickable {
     constructor(damage) {
         super()
-        this.damage = damage
+        this.damage = damage;
         this.sprite = new Sprite("ui/attackbar");
         this.indicator = new Sprite("ui/attackbar_indi1")
         this.progress = 1;
@@ -1134,11 +1170,12 @@ class AttackBar extends Tickable {
     keyPressed(e) {
         if (this.canPress) {
             if (e.keyCode == 90 || e.keyCode == 13) { // Z
+                console.log(this.damage)
                 this.canPress = false;
-                playerDamageMultiplier = -Math.abs((2 * this.progress) - 1) + 1;
+                let playerDamageMultiplier = -Math.abs((2 * this.progress) - 1) + 1;
                 this.moving = false;
                 this.flicker = true;
-                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage * playerDamageMultiplier)
+                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage)
                 setTimeout(function(self = this) {
                     this.destroy()
                     if (!undertale.battle.winCheck) {
@@ -1366,6 +1403,7 @@ class Battle {
     }
 
     winCheck() {
+        let allDead = true;
         for (let x in this.enemies) {
             if (this.enemies[x].hp > 0 || this.enemies[x].spared) {
                 allDead = false;
@@ -1419,6 +1457,8 @@ window.addEventListener('load', function() {
         "soul_dead",
         "soul_shard",
         "soul",
+        "enemy/froggit_body",
+        "enemy/froggit_face",
         "ui/attackbar_indi1",
         "ui/attackbar_indi2"
     ], spritesLoaded)
@@ -1580,7 +1620,7 @@ window.addEventListener('load', function() {
     canvas.imageSmoothingQuality = "low"
     undertale = new Undertale();
     setInterval(function() {
-        globalTime += .5;
+        globalTime += 1;
         for (let m in undertale.tickables) {
             undertale.tickables[m].beginTick();
             undertale.tickables[m].tick();
