@@ -294,31 +294,46 @@ class Item {
         this.func = func;
     }
 
+    onUse() {}
+
     showMessage(message) {
         textbox.show();
         textbox.setMessage(message);
         textbox.confirmed = function() {
             textbox.hide();
-            playerActDone;
+            playerActDone();
         }
     }
 }
 
-class BasicHealingItem {
-    constructor(name, hp, message) {
+class BasicHealingItem extends Item {
+    constructor(name, seriousModeName, hp, message) {
+        super();
         this.name = name;
+        this.seriousModeName = seriousModeName;
         this.hp = hp;
         this.message = message;
+        this.pMessage = this.message;
     }
 
     onUse() {
-        player.hp = Math.min(player.hp + this.hp,player.maxHp);
-        if (player.hp >+ player.maxHp) {
-            this.message += "\n*Your HP were maxed out."
+        console.log(this.hp);
+        player.hp = Math.min(player.hp + this.hp,undertale.battle.maxHp)
+        if (player.hp >= undertale.battle.maxHp) {
+            if (undertale.battle.seriousMode) {
+                this.message = "\n*Your HP were maxed out."
+            } else {
+                this.message += "\n*Your HP were maxed out!"
+            }
         } else {
-            this.message += "\n*You restored "+(this.hp)+" HP."
+            if (undertale.battle.seriousMode) {
+                this.message = "\n*You restored "+(this.hp)+" HP."
+            } else {
+                this.message += "\n*You restored "+(this.hp)+" HP!"
+            }
         }
-        this.showMessage(this.message)
+        this.showMessage(this.message);
+        this.message = this.pMessage;
     }
 }
 
@@ -394,13 +409,13 @@ class Sprite {
             let w = this.image.naturalWidth / this.num
             if (this.disintegrating) {
                 canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
-                // Fade out while it disintegrates
-                canvas.fillStyle = "rgba(0,0,0,"+Math.max(30 / this.disintegrateTime,0)+")"
-                canvas.fillRect(x,y,this.image.naturalWidth / this.num, this.naturalHeight)
+                // Fade out while it disintegrates +Math.max(30 / this.disintegrateTime,0)+
+                canvas.fillStyle = "rgba(0,0,0,"+Math.max(this.disintegrateTime/10,0)+")"
+                canvas.fillRect(x,y,this.image.naturalWidth / this.num, this.image.naturalHeight)
                 this.disintegrateTime += 1.5
                 for (let d in this.disintegrate) {
                     this.disintegrate[d].y -= Math.random() * 4
-                    canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(128 - (this.disintegrateTime * 4), 0)),2)
+                    canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(100 - (this.disintegrateTime * 4), 0)),2)
                 }
             } else {
                 canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
@@ -448,29 +463,25 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
     }
 }
 
+// ========================================================================== //
+// Enemies
+
 class Enemy extends Tickable {
     mercy = 0;
     maxHp = 50;
     name = "Enemy"
     acts = [
-        {"name": "Check", "func": this.actCheck},
-        {"name": "Beg", "func": this.actBeg}
+        {"name": "Check", "func": this.actCheck}
     ]
     flavorTexts = [
-        "The enemy is malfunctioning.",
-        "The enemy wants to attack\nyou... I think?",
-        "The enemy is wondering why\nit's a placeholder.",
-        "The enemy wishes it could be\nin Deltarune instead.",
-        "The enemy is unimpressed with\nthe developer.",
-        "The enemy wishes it had a\nremotely challenging attack."
+        "Flavor Text"
     ]
     description = "It's an enemy. Wow."
-    face = new Sprite("enemy/froggit_face",2);
-    body = new Sprite('enemy/froggit_body',2)
+    sprite = new Sprite("enemy/dummy");
     x = 128;
     y = 64;
     frameNorm = 0;
-    frameSpareDeath = 1;
+    frameSpareDeath = 0;
 
     constructor() {
         super()
@@ -488,31 +499,16 @@ class Enemy extends Tickable {
         this.collides = false;
     }
 
+    get spriteTime() {
+        return this.spared ? 0 : globalTime;
+    }
+
     actCheck(self) {
         textbox.show();
         textbox.setMessage(self.description);
         textbox.confirmed = function() {
             playerActDone();
             textbox.hide();
-        }
-    }
-
-    actBeg(self) {
-        if (self.mercy.inRange(0,24)) {
-            basicTextAct(self,"You begged the enemy to make a\nbetter attack.\n*It's listening...", 25);
-            self.acts.push({"name":"Assist", "func": self.actAssist})
-        } else {
-            basicTextAct(self, "For some reason, you keep begging\nthe enemy.\n*It think you're a real a nutcase!")
-        }
-    }
-
-    actAssist(self) {
-        if (self.mercy.inRange(25, 49, true)) {
-            basicTextAct(self,"You gave the enemy some ideas for\nan attack.", 25);
-        } else if (self.mercy < 100) {
-            basicTextAct(self,"You keep giving it ideas. You're\nspeaking so fast it can't even\nunderstand!",50);
-        } else {
-            basicTextAct(self,"The enemy gets your point by now...")
         }
     }
 
@@ -587,8 +583,7 @@ class Enemy extends Tickable {
 
     spareAnimation() {
         this.frame = this.frameSpareDeath;
-        this.body.brightness = 50;
-        this.face.brightness = 50;
+        this.sprite = 50;
 
         let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
         undertale.spawn(dust);
@@ -596,13 +591,11 @@ class Enemy extends Tickable {
 
     spare() {
         this.spared = true;
-        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
         this.spareAnimation();
     }
 
     deferredRender() {
-        this.face.draw(this.x + this.xOffset + Math.sin(globalTime * .1) * 5,this.y + Math.sin(globalTime * .2) * 2,this.frame)
-        this.body.draw(this.x + this.xOffset * 2,this.y + 64,this.frame)
+        this.sprite.draw(this.x + this.xOffset,this.y,this.frame)
     }
 
     render() {
@@ -614,7 +607,7 @@ class Enemy extends Tickable {
             canvas.fillRect(this.x - 16, 90, 128, 16);
             // actual health
             canvas.fillStyle = 'lime';
-            canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualHp / this.maxhp)),0), 16);
+            canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualHp / this.maxHp)),0), 16);
         }
         if (this.drawMercyBar) {
             canvas.fillStyle = 'gray';
@@ -625,6 +618,84 @@ class Enemy extends Tickable {
             canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualMercy / 100)),0), 16);
             canvas.fillText("+"+this.mercyGain+"%", this.x+32, 80 - this.textY)
         }
+    }
+
+    attack() {
+        this.testAttack()
+    }
+
+    testAttack() {
+        new AttackFactory(() => {
+            for (let x = 0;x < 5; x++) {
+                new Bullet("soul",320+(x*16),240,5,function(){this.y += 2})
+            }
+        },3)
+    }
+}
+
+class Froggit extends Enemy {
+    mercy = 0;
+    maxHp = 50;
+    name = "Froggit"
+    acts = [
+        {"name": "Check", "func": this.actCheck},
+        {"name": "Beg", "func": this.actBeg}
+    ]
+    flavorTexts = [
+        "The enemy is malfunctioning.",
+        "The enemy wants to attack\nyou... I think?",
+        "The enemy is wondering why\nit's a placeholder.",
+        "The enemy wishes it could be\nin Deltarune instead.",
+        "The enemy is unimpressed with\nthe developer.",
+        "The enemy wishes it had a\nremotely challenging attack."
+    ]
+    description = "It's an enemy. Wow."
+    face = new Sprite("enemy/froggit_face",2);
+    body = new Sprite('enemy/froggit_body',2)
+    x = 128;
+    y = 64;
+    frameNorm = 0;
+    frameSpareDeath = 1;
+
+    actBeg(self) {
+        if (self.mercy.inRange(0,24)) {
+            basicTextAct(self,"You begged the enemy to make a\nbetter attack.\n*It's listening...", 25);
+            self.acts.push({"name":"Assist", "func": self.actAssist})
+        } else {
+            basicTextAct(self, "For some reason, you keep begging\nthe enemy.\n*It think you're a real a nutcase!")
+        }
+    }
+
+    actAssist(self) {
+        this.flavorTexts = ["The enemy is waiting for your next idea."]
+        if (self.mercy.inRange(25, 49, true)) {
+            basicTextAct(self,"You gave the enemy some ideas for\nan attack.", 25);
+        } else if (self.mercy < 100) {
+            basicTextAct(self,"You keep giving it ideas. You're\nspeaking so fast it can't even\nunderstand!",50);
+        } else {
+            basicTextAct(self,"The enemy gets your point by now...")
+        }
+    }
+
+    deathAnimation() {
+        playSound("monsterdust.wav")
+        this.face.disintegrating = true;
+        this.body.disintegrating = true;
+    }
+
+    spareAnimation() {
+        this.frame = this.frameSpareDeath;
+        this.body.brightness = 50;
+        this.face.brightness = 50;
+
+        let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
+        undertale.spawn(dust);
+    }
+
+    deferredRender() {
+        let f = Math.round((globalTime) * 2 % 2)
+        this.face.draw(this.x + this.xOffset + Math.sin(this.spriteTime * .1) * 5,this.y + Math.sin(this.spriteTime * .2) * 2,f)
+        this.body.draw(this.x + this.xOffset * 2,this.y + 62,f)
     }
 
     attack() {
@@ -668,10 +739,6 @@ class SpareDust extends Tickable {
         this.smoke.draw(this.x + m,this.y - m)
         this.smoke.draw(this.x + m,this.y + m)
     }
-}
-
-class Froggit extends Enemy {
-
 }
 
 class Bullet extends Tickable {
@@ -851,6 +918,7 @@ class Soul extends Tickable {
     actMenu = false;
     selectedListItem = 0;
     attackMenu = false;
+    itemSelect = false;
     listLength = 0;
     attackProg = 1;
     invincibility = 0;
@@ -886,9 +954,9 @@ class Soul extends Tickable {
             this.x = 40 + (this.selectedAct * 156)
             this.y = 445
         }
-        if (this.targetSelect || this.actTargetSelect || this.actMenu) {
-            this.x = 55
-            this.y = 278 + this.selectedListItem * 32
+        if (this.targetSelect || this.actTargetSelect || this.actMenu || this.itemSelect) {
+            this.x = 55 + (Math.floor((this.selectedListItem % 2) * 215))
+            this.y = 278 + (Math.floor(this.selectedListItem/2)) * 32
         }
     }
 
@@ -960,6 +1028,7 @@ class Soul extends Tickable {
                 undertale.spawn(new AttackBar(5 + ((undertale.battle.love-1) * 56)))
             } else if (this.actTargetSelect) {
                 this.selectedActTarget = this.selectedListItem;
+                this.selectedListItem = 0;
                 this.actTargetSelect = false;
                 this.actMenu = true;
                 this.list = []
@@ -973,6 +1042,11 @@ class Soul extends Tickable {
                 this.drawSoul = false;
                 let e = undertale.battle.enemies[this.selectedActTarget]
                 e.acts[this.selectedListItem].func(e);
+            } else if (this.itemSelect) {
+                this.itemSelect = false;
+                this.drawSoul = false;
+                undertale.battle.items[this.selectedListItem].onUse();
+                undertale.battle.items.splice(this.selectedListItem,1)
             }
 
             if (this.selectMenu || this.fightMenu || this.actTargetSelect || this.actMenu) {
@@ -1002,27 +1076,46 @@ class Soul extends Tickable {
                         }
                     break;
 
+                    case 2: // item
+                        this.selectedListItem = 0;
+                        this.itemSelect = true;
+                        this.list = []
+                        textbox.hide();
+                        for (let x in undertale.battle.items) {
+                            this.list.push(undertale.battle.items[x].name)
+                        }
+                        
+                    break;
+
                     case 3: // Spare
                         let foundOne = false;
+                        let THEDEADONES = []
                         for (let x in undertale.battle.enemies) {
                             if (undertale.battle.enemies[x].mercy >= 100) {
                                 foundOne = true;
                                 undertale.battle.enemies[x].spare();
+                                THEDEADONES.push(undertale.battle.enemies[x])
                             }
                         }
                         if (!foundOne) {
                             textbox.show();
                             textbox.setMessage("But nobody's names were yellow...")
                             textbox.confirmed = function() {
+                                console.log("efdffjkwfjn")
+                                playerActDone();
                                 textbox.hide();
-                                this.selectMenu = true;
                             }
                         } else {
                             setTimeout(function() {
-                                if (!undertale.battle.winCheck) {
+                                // If we didn't win,
+                                // Retire all spared enemies
+                                for (let x in THEDEADONES) {
+                                    undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(THEDEADONES[x]),1)
+                                }
+                                if (!undertale.battle.winCheck()) {
                                     playerActDone();
                                 }
-                            },1000)
+                            },1)
                         }
                     break;
                 }
@@ -1030,10 +1123,11 @@ class Soul extends Tickable {
         }
 
         if (e.keyCode == 88 || e.keyCode == 16) {
-            if (this.targetSelect || this.actTargetSelect) {
+            if (this.targetSelect || this.actTargetSelect || this.itemSelect) {
                 this.targetSelect = false;
                 this.actTargetSelect = false;
                 this.selectMenu = true;
+                this.itemSelect = false;
                 this.actMenu = false;
                 textbox.show()
                 chooseFlavorText();
@@ -1064,10 +1158,15 @@ class Soul extends Tickable {
            h = 1
         }
 
-        if (this.targetSelect || this.actTargetSelect || this.actMenu) {
+        if (this.targetSelect || this.actTargetSelect || this.actMenu || this.itemSelect) {
             if (v != 0) {
                 playSound("snd_squeak.wav")
-                this.selectedListItem = clamp(this.selectedListItem + v,0,this.list.length - 1)
+                this.selectedListItem = clamp(this.selectedListItem + (v * 2),0,this.list.length - 1)
+            }
+            if (h != 0) {
+                playSound("snd_squeak.wav")
+                this.selectedListItem = clamp(this.selectedListItem + h,0,this.list.length - 1)
+                console.log(this.selectedListItem)
             }
         }
 
@@ -1135,19 +1234,29 @@ class Soul extends Tickable {
         this.battleSlash.draw(358,406)
         canvas.font = "32px utFont";
 
-        if (this.targetSelect || this.actMenu || this.actTargetSelect) {
-            for (let x in this.list) {
+        if (this.targetSelect || this.actMenu || this.actTargetSelect || this.itemSelect) {
+            for (let x = 0; x < this.list.length; x += 2) {
+                // Render first column
                 if (this.actTargetSelect || this.targetSelect) {
                     if (undertale.battle.enemies[x].mercy >= 100) {
                         canvas.fillStyle = "yellow"
                     }
                 }
-                canvas.fillText("*  "+this.list[x],84,294 + x * 32)
+                canvas.fillText("*  "+this.list[x],84,294 + (Math.floor(x/2)) * 32)
                 canvas.fillStyle = "white"
+                // Render second column
+                if (this.list[x + 1]) {
+                    if (this.actTargetSelect || this.targetSelect) {
+                        if (undertale.battle.enemies[x + 1].mercy >= 100) {
+                            canvas.fillStyle = "yellow"
+                        }
+                    }
+                    canvas.fillText("*  "+this.list[x + 1],300,294 + (Math.floor(x/2)) * 32)
+                    canvas.fillStyle = "white"
+                }
             }
         }
     }
-
     }
 }
 
@@ -1393,13 +1502,26 @@ class BattleGimmick {
 }
 
 class Battle {
-    constructor(initialSoulMode = new SoulMode(), enemies, maxHp = 20, gimmick, love = 1, music = "enemy.mp3") {
-        this.initialSoulMode = initialSoulMode
-        this.enemies = enemies;
-        this.maxHp = maxHp;
-        this.gimmick = gimmick;
-        this.love = love;
-        this.music = music;
+    items = [
+        Glamburger,
+        CinnaBun,
+        Glamburger,
+        CinnaBun,
+        Glamburger,
+        CinnaBun
+    ]
+    seriousMode = false;
+    constructor(data) {
+        this.BattleDatatoVars(data)
+    }
+
+    BattleDatatoVars(data) {
+        this.initialSoulMode = data.soulMode
+        this.enemies = data.enemies
+        this.maxHp = data.maxHp
+        this.gimmick = data.gimmick
+        this.love = data.love
+        this.music = data.music
     }
 
     winCheck() {
@@ -1409,7 +1531,11 @@ class Battle {
                 allDead = false;
             }
         }
+        if (undertale.battle.enemies.length == 0) {
+            allDead = true;
+        }
         if (allDead) {
+            console.log("Win")
             SND(this.music).pause()
             textbox.show()
             textbox.setMessage("YOU WON! You earned... nothing?")
@@ -1424,7 +1550,14 @@ class Undertale {
     tickables = []
     collision = []
     constructor() {
-        this.battle = new Battle(new SoulMode(), [new Enemy()]);
+        this.battle = new Battle({
+            "soulMode": new SoulMode(),
+            "enemies": [new Froggit()],
+            "maxHp": 20,
+            "gimmick": new BattleGimmick(),
+            "love": 1,
+            "music": "enemy.mp3"
+        });
         playSound(this.battle.music, true)
         for (let x in this.battle.enemies) {
             this.spawn(this.battle.enemies[x]);
@@ -1441,6 +1574,7 @@ class Undertale {
     
 window.addEventListener('load', function() {
     loadIndicator = document.getElementById("loadIndicator");
+
     loadSprites([
         "enemy/dummy",
         "ui/ut_smoke",
