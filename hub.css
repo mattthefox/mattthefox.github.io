@@ -1,0 +1,31 @@
+body {
+    background-color: black;
+}
+
+h1 {
+    color: white;
+    font-family: Tahoma;
+    font-size: 100px;
+    margin: auto;
+    width: 50%;
+}
+
+p {
+    font-style: italic;
+    color: white;
+}
+
+a {
+    transition: font-size .5s;
+    font-size: 50px;
+    font-family: Tahoma;
+    color: white;
+    font-family: Tahoma;
+    animation: 3s ease-in;
+}
+
+a:hover {
+    font-size: 52px;
+    color: yellow;
+
+}
