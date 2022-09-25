@@ -766,6 +766,78 @@ class Froggit extends Enemy {
     }
 }
 
+class MettatonEX extends Enemy {
+    mercy = 0;
+    maxHp = 18;
+    name = "Mettaton EX"
+    acts = [
+        {"name": "Check", "func": this.actCheck}
+    ]
+    flavorTexts = [
+        "Smells like Mettaton."
+    ]
+    description = "It's an enemy. Wow."
+    face = new Sprite("enemy/mex_body",1);
+    body = new Sprite('enemy/froggit_body',2)
+    x = 128;
+    y = 64;
+    frameNorm = 0;
+    frameSpareDeath = 1;
+
+    actBeg(self) {
+        if (self.mercy.inRange(0,24)) {
+            basicTextAct(self,"You begged the enemy to make a\nbetter attack.\n*It's listening...", 25);
+            self.acts.push({"name":"Assist", "func": self.actAssist})
+        } else {
+            basicTextAct(self, "For some reason, you keep begging\nthe enemy.\n*It think you're a real a nutcase!")
+        }
+    }
+
+    actAssist(self) {
+        this.flavorTexts = ["The enemy is waiting for your next idea."]
+        if (self.mercy.inRange(25, 49, true)) {
+            basicTextAct(self,"You gave the enemy some ideas for\nan attack.", 25);
+        } else if (self.mercy < 100) {
+            basicTextAct(self,"You keep giving it ideas. You're\nspeaking so fast it can't even\nunderstand!",50);
+        } else {
+            basicTextAct(self,"The enemy gets your point by now...")
+        }
+    }
+
+    deathAnimation() {
+        playSound("monsterdust.wav")
+        this.face.disintegrating = true;
+        this.body.disintegrating = true;
+    }
+
+    spareAnimation() {
+        this.frame = this.frameSpareDeath;
+        this.body.tint = new Color(0,0,0,50);
+        this.face.tint = new Color(0,0,0,50);
+
+        let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
+        undertale.spawn(dust);
+    }
+
+    deferredRender() {
+        let f = Math.round((globalTime) * 2 % 2)
+        this.face.draw(this.x + this.xOffset + Math.sin(this.spriteTime * .1) * 5,this.y + Math.sin(this.spriteTime * .2) * 2,f)
+        this.body.draw(this.x + this.xOffset * 2,this.y + 62,f)
+    }
+
+    attack() {
+        this.testAttack()
+    }
+
+    testAttack() {
+        new AttackFactory(() => {
+            for (let x = 0;x < 5; x++) {
+                new Bullet("soul",320+(x*16),240,5,function(){this.y += 2})
+            }
+        },3)
+    }
+}
+
 class SpareDust extends Tickable {
     x;
     y;
@@ -1609,7 +1681,7 @@ class Undertale {
     constructor() {
         this.battle = new Battle({
             "soulMode": new SoulMode(),
-            "enemies": [new Froggit()],
+            "enemies": [new MettatonEX()],
             "maxHp": 20,
             "gimmick": new BattleGimmick(),
             "love": 1,
