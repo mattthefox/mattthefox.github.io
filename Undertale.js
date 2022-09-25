@@ -32,7 +32,9 @@ function SND(file) {
 
 function audioLoop(paths, index, callback) {
     let file = "./snd/"+paths[index];
-    let sound = new Audio(file);
+    let sound = new Howl({
+        src: [file]
+    });
     //sound.onload = function() {
         sounds[file] = sound;
         console.log(sounds[file])
@@ -111,6 +113,7 @@ function chooseFlavorText() {
 }
 
 function enemyAttackDone() {
+    console.log(undertale.tickables)
     if (!player.death) {
         battlebox.interpTo(32,250,607,385,8);
         player.collides = false;
@@ -126,10 +129,15 @@ function enemyAttackDone() {
         player.attackProg = 1;
         textbox.show()
     }
-    for (let x in undertale.tickables) {
-        if (undertale.tickables[x].prototype instanceof Bullet || undertale.tickables[x].prototype === Bullet) {
-            undertale.tickables[x].destroy()
+    let kill = [];
+    for (let x = 0; x < undertale.tickables.length; x++) {
+        if (undertale.tickables[x].isBullet) {
+            //Have to append to another one because itd result in an array that changes while being iterated.
+            kill.push(undertale.tickables[x])
         }
+    }
+    for (let x in kill) {
+        kill[x].destroy()
     }
     chooseFlavorText();
 
@@ -165,13 +173,17 @@ var fontLoaded = false;
 canvas = document.querySelector('canvas');
 var utFont = new FontFace('utFont', 'url(./DeterminationMono.ttf)');
 var menuFont = new FontFace('menuFont','url(./MenuFont.otf)')
+var damageFont = new FontFace('damageFont','url(./DamageFont.ttf)')
 
 utFont.load().then(function(font){
   document.fonts.add(font);
   menuFont.load().then(function(font){
-    console.log("Fonts Loaded")
     document.fonts.add(font);
-    fontLoaded = true;
+    damageFont.load().then(function(font){
+        console.log("Fonts Loaded")
+        document.fonts.add(font);
+        fontLoaded = true;
+      });
   });
 });
 
@@ -373,10 +385,11 @@ class MasterTick extends Tickable {
 }
 
 class Color {
-    constructor(r, g, b) {
+    constructor(r, g, b, a = 100) {
         this.r = r;
         this.g = g;
         this.b = b;
+        this.a = a;
     }
 }
 
@@ -403,7 +416,7 @@ class Sprite {
             this.disintegrate.push({y: (x * .1) + 32})
         }
         this.disintegrating = false;
-        this.brightness = 100;
+        this.tint = new Color(0,0,0,0);
     }
 
     draw(x = 0,y = 0,frame = 0,rotation = 0, origin = new Vector2(0.5,0.5)) {
@@ -428,10 +441,12 @@ class Sprite {
                 canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
             }
         }
-
-        canvas.fillStyle = "rgba(0,0,0,"+(1-(this.brightness / 100))+")"
+        
+        canvas.globalCompositeOperation = "multiply"
+        canvas.fillStyle = "rgba("+this.tint.r+","+this.tint.g+","+this.tint.b+","+(this.tint.a / 100)+")"
         canvas.fillRect(x,y,this.image.naturalWidth / this.num,this.image.naturalHeight)
         canvas.rotate((Math.PI / 180) * -rotation);
+        canvas.globalCompositeOperation = "source-over"
         canvas.fillStyle = "white"
     }
 
@@ -443,13 +458,17 @@ class Sprite {
 class AttackFactory {
     // An attack factory can be called for easy creation of attacks
     // that have similar properties.
-    // Best fit for fights such as Undyne's spears with the green soul,
+    // Best fit for fights such as Undyne's spears with the green soul
+    // (Input a sequence of arrow characters and it will create the attack
+    // as such, therefore removing the need for a big array of objects)
     // Asgore's various circles of fire or Mettaton's disco ball attack.
     constructor(attack, timer = 3) {
         this.timer = timer;
         attack();
         setTimeout(() => {
-            enemyAttackDone()
+            if (!player.death) {
+                enemyAttackDone()
+            }
         },timer * 1000)
     }
 
@@ -475,7 +494,7 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
 
 class Enemy extends Tickable {
     mercy = 0;
-    maxHp = 50;
+    maxHp = 18;
     name = "Enemy"
     acts = [
         {"name": "Check", "func": this.actCheck}
@@ -489,6 +508,7 @@ class Enemy extends Tickable {
     y = 64;
     frameNorm = 0;
     frameSpareDeath = 0;
+    fearful = true; // Able to be spared instantly when attacked?
 
     constructor() {
         super()
@@ -502,8 +522,10 @@ class Enemy extends Tickable {
         this.spared = false;
         this.textY = 0;
         this.mercyGain = 0;
+        this.damageGain = 0;
         this.frame = this.frameNorm;
         this.collides = false;
+        this.forcedMercy = false;
     }
 
     get spriteTime() {
@@ -521,14 +543,15 @@ class Enemy extends Tickable {
 
     addMercy(amount) {
         // @todo MERCY: draw amount of damage, play sound after adding an amount of mercy.
-        playSound("snd_select.wav")
+        this.textY = 0;
+        this.mercyAnimation();
+        playSound("snd_spellcast.wav")
         this.mercyGain = amount;
         this.drawMercyBar = true;
         let initMercy = this.mercy;
         this.mercy += amount;
         let time = 0;
         let interval = setInterval(function(self = this) {
-            playSound("snd_squeak.wav")
             self.visualMercy = lerp(self.mercy, initMercy, time / 20)
             time += 1;
             this.textY += 1;
@@ -549,15 +572,34 @@ class Enemy extends Tickable {
         }
     }
 
+    mercyAnimation() {
+        this.face.tint = new Color(255,255,0,100)
+        this.body.tint = new Color(255,255,0,100)
+        setTimeout(function(self = this) {
+            this.face.tint = new Color(0,0,0,0)
+            this.body.tint = new Color(0,0,0,0)
+        }.bind(this),200)
+    }
+
     onDamage(damage) {
-        console.log(damage)
         // @todo FIGHT: draw amount of damage after being struck.
         //undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+        this.textY = 0;
         this.hurtAnimation(false)
+        this.damageGain = damage;
         this.drawHealthBar = true;
-        playSound("snd_damage.wav")
+        if (this.mercy >= 100 && !this.forcedMercy) {
+            playSound("snd_damage.wav")
+            playSound("snd_damage.wav")
+        } else {
+            playSound("snd_damage.wav")
+        }
+        if (this.fearful) {
+            this.mercy = 100;
+            this.forcedMercy = true;
+        }
         let initHp = this.hp;
-        this.hp = this.hp - 25;
+        this.hp = this.hp - damage;
         let time = 0;
         let curDir = false;
         setTimeout(function(self = this) {
@@ -597,6 +639,7 @@ class Enemy extends Tickable {
     }
 
     spare() {
+        playSound("snd_spare.wav")
         this.spared = true;
         this.spareAnimation();
     }
@@ -615,6 +658,10 @@ class Enemy extends Tickable {
             // actual health
             canvas.fillStyle = 'lime';
             canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualHp / this.maxHp)),0), 16);
+            canvas.fillStyle = "red"
+            canvas.font = "36px damageFont"
+            this.textY += .5
+            canvas.fillText(Math.ceil(this.damageGain), this.x-24, 80 - this.textY)
         }
         if (this.drawMercyBar) {
             canvas.fillStyle = 'gray';
@@ -623,7 +670,8 @@ class Enemy extends Tickable {
             // actual health
             canvas.fillStyle = 'yellow';
             canvas.fillRect(this.x - 16, 90, Math.max((128 * (this.visualMercy / 100)),0), 16);
-            canvas.fillText("+"+this.mercyGain+"%", this.x+32, 80 - this.textY)
+            canvas.font = "36px damageFont"
+            canvas.fillText("+"+this.mercyGain+"%", this.x-24, 80 - this.textY)
         }
     }
 
@@ -642,7 +690,7 @@ class Enemy extends Tickable {
 
 class Froggit extends Enemy {
     mercy = 0;
-    maxHp = 50;
+    maxHp = 18;
     name = "Froggit"
     acts = [
         {"name": "Check", "func": this.actCheck},
@@ -692,8 +740,8 @@ class Froggit extends Enemy {
 
     spareAnimation() {
         this.frame = this.frameSpareDeath;
-        this.body.brightness = 50;
-        this.face.brightness = 50;
+        this.body.tint = new Color(0,0,0,50);
+        this.face.tint = new Color(0,0,0,50);
 
         let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
         undertale.spawn(dust);
@@ -750,6 +798,7 @@ class SpareDust extends Tickable {
 
 class Bullet extends Tickable {
     time;
+    isBullet = true;
     constructor(sprite, x, y, damage = 5, movement, collisionWidth = 16, collisionHeight = 16) {
         super()
         this.sprite = new Sprite(sprite);
@@ -762,12 +811,11 @@ class Bullet extends Tickable {
         this.collisionHeight = collisionHeight;
         this.collision = new Collision(x,y,x+collisionWidth,y+collisionHeight)
         this.collision.blocking = false;
-        console.log(this.collision)
         this.movement = movement;
         this.collision.onHit = function(other) {
             if (other == player) {
                 if (player.invincibility == 0) {
-                    player.invincibility = 50;
+                    player.invincibility = 35;
                     player.onDamage(damage)
                 }
 
@@ -828,8 +876,9 @@ class SoulMode {
             let s = Math.sin(this.owner.invincibility * 1) + 1.5
             trueColor = new Color(this.color.r * s,this.color.g * s,this.color.b * s)
         }
+        this.sprite.tint = trueColor;
         if (!this.shards) {
-        this.sprite.draw(this.owner.x,this.owner.y)
+            this.sprite.draw(this.owner.x,this.owner.y)
         } else {
             this.sprite.draw(this.shard1.x,this.shard1.y)
             this.sprite.draw(this.shard2.x,this.shard2.y)
@@ -838,10 +887,6 @@ class SoulMode {
             this.sprite.draw(this.shard5.x,this.shard5.y)
 
         }
-        canvas.globalCompositeOperation = "multiply"
-        canvas.fillStyle ="rgb("+trueColor.r+","+trueColor.g+","+trueColor.b
-        canvas.fillRect(0,0,640,480)
-        canvas.globalCompositeOperation = "source-over"
     }
 }
 
@@ -1213,16 +1258,14 @@ class Soul extends Tickable {
     }
 
     render() {
-        if (this.drawSoul) {
-            this.mode.render()
-        }
+
         if (this.drawUi) {
-        canvas.globalCompositeOperation = "lighter"
+        //canvas.globalCompositeOperation = "lighter"
         this.fightButton.draw(32,432)
         this.actButton.draw(185,432)
         this.itemButton.draw(345,432)
         this.mercyButton.draw(500,432)
-        canvas.globalCompositeOperation = "source-over"
+        //canvas.globalCompositeOperation = "source-over"
         
         // health
         canvas.fillStyle = "maroon";
@@ -1264,6 +1307,9 @@ class Soul extends Tickable {
             }
         }
     }
+        if (this.drawSoul) {
+            this.mode.render()
+        }
     }
 }
 
@@ -1289,9 +1335,13 @@ class AttackBar extends Tickable {
                 console.log(this.damage)
                 this.canPress = false;
                 let playerDamageMultiplier = -Math.abs((2 * this.progress) - 1) + 1;
+                let u = undertale.battle.enemies[player.selectedListItem];
+                if (u.mercy >= 100 && !u.forcedMercy) {
+                    playerDamageMultiplier = 99999;
+                }
                 this.moving = false;
                 this.flicker = true;
-                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage)
+                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage * playerDamageMultiplier)
                 setTimeout(function(self = this) {
                     this.destroy()
                     if (!undertale.battle.winCheck) {
