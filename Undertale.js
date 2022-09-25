@@ -83,9 +83,16 @@ function lerp(min,max,t) {
 
 function playSound(path, loop = false) {
     let file = "./snd/"+path
+    var sound = new Howl({
+        src: [file],
+        loop: loop
+    })
+    sound.play()
+    sounds[file] = sound;
+    /*
     sounds[file].currentTime = 0;
     sounds[file].play()
-    sounds[file].loop = loop;
+    sounds[file].loop = loop;*/
 }
 
 function chooseFlavorText() {
