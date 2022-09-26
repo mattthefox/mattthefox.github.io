@@ -156,16 +156,16 @@ function playerActDone() {
 }
 
 
-function printAt(context, text, x, y)
+function printAt(context, text, x, y, lineHeight = 32)
 {
     let splits = text.split("\n");
     for (let g in splits) {
         let text = splits[g]
         if (splits[g].startsWith("*")) {
             text = text.slice(1)
-            context.fillText("*", x - 32, y+ (g * 32))
+            context.fillText("*", x - 32, y+ (g * lineHeight))
         }
-        context.fillText(text, x, y + (g * 32));
+        context.fillText(text, x, y + (g * lineHeight));
     }
 }
 
@@ -408,6 +408,9 @@ class Sprite {
     loaded = false;
     prevLoaded = false;
     scale = new Vector2(1,1);
+    x;
+    y;
+    rot;
 
     constructor(file, num = 1) {
         this.num = num;
@@ -422,6 +425,9 @@ class Sprite {
     }
 
     draw(x = 0,y = 0,frame = 0,rotation = 0, origin = new Vector2(0.5,0.5)) {
+        this.x = x;
+        this.y = y;
+        this.rot = rotation;
         let localOrigin = new Vector2(origin.x * this.image.naturalWidth, origin.y * this.image.naturalHeight)
         canvas.translate(localOrigin.x, localOrigin.y);
         canvas.rotate((Math.PI / 180) * rotation);
@@ -479,10 +485,6 @@ class AttackFactory {
             }
         },timer * 1000)
     }
-
-    tick() {
-
-    }
 }
 
 function basicTextAct(enemy, message, mercyCounter = 0) {
@@ -492,8 +494,10 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
         if (mercyCounter != 0) {
             enemy.addMercy(mercyCounter);
         }
-        playerActDone();
-        textbox.hide();
+        setTimeout(function(self = this) {
+            playerActDone();
+            textbox.hide();
+        }.bind(this),500)
     }
 }
 
@@ -534,6 +538,11 @@ class Enemy extends Tickable {
         this.frame = this.frameNorm;
         this.collides = false;
         this.forcedMercy = false;
+        this.enemyNumber = 0;
+    }
+
+    init() {
+        this.x = this.x + (this.enemyNumber * 160)
     }
 
     get spriteTime() {
@@ -715,7 +724,7 @@ class Froggit extends Enemy {
     description = "It's an enemy. Wow."
     face = new Sprite("enemy/froggit_face",2);
     body = new Sprite('enemy/froggit_body',2)
-    x = 128;
+    x = 64;
     y = 64;
     frameNorm = 0;
     frameSpareDeath = 1;
@@ -762,7 +771,8 @@ class Froggit extends Enemy {
     }
 
     attack() {
-        this.testAttack()
+        let m = new TextBubble("Ribbit, ribbit.", this.face);
+        m.confirmed = this.testAttack;
     }
 
     testAttack() {
@@ -1625,36 +1635,71 @@ class TypingText extends Tickable {
 }
 
 class TextBubble extends Tickable {
-    constructor(message, confirmable) {
+    constructor(message, speaker, confirmable = false, offset = new Vector2(0,-32)) {
         super()
         this.message = message;
+        this.speaker = speaker;
         this.curLetter = 0;
-        this.curMessage = ""
+        this.curMessage = "";
+        this.offset = offset;
         this.prevMessage = message;
-        setInterval(function(self = this) {
+        let i = setInterval(function(self = this) {
             if (self.curLetter < self.message.length) {
                 self.curMessage = self.curMessage + self.message.charAt(self.curLetter);
                 self.curLetter += 1;
+            } else {
+                clearInterval(i)
+                setTimeout(function(self=this){
+                    this.destroy();
+                    this.confirmed();
+                }.bind(this),600)
             }
         }.bind(this),50)
+        this.corner = new Sprite("ui/textBubble",8)
+        undertale.spawn(this);
     }
 
     confirmed() {}
 
     keyPressed(e) {
-        if (e.keyCode == 90 || e.keyCode == 13) { // Z
-            if (this.curLetter >= this.message.length) {
-                this.destroy();
-                this.confirmed();
+        if (this.confirmable) {
+            if (e.keyCode == 90 || e.keyCode == 13) { // Z
+                // check if every textbox that exists is OK to clear, then trigger them all at once.
+                if (this.curLetter >= this.message.length) {
+                    this.destroy();
+                    this.confirmed();
+                }
+            } else if (e.keyCode == 88 || e.keyCode == 16) {
+                this.curLetter = this.message.length
+                this.curMessage = this.message;
             }
-        } else if (e.keyCode == 88 || e.keyCode == 16) {
-            this.curLetter = this.message.length
-            this.curMessage = this.message;
         }
     }
 
+    render() {
+        let x = this.speaker.x + (this.speaker.image.naturalWidth/this.speaker.num) + 8
+        let y = this.speaker.y - 32;
+        let w = 128;
+        let h = 64;
+        let offset = this.offset;
+        canvas.fillStyle = "white"
+        canvas.fillRect(x+offset.x+1,y+offset.y+1,w+15,h+15)
+        //Triangle
+        if (offset.x < 0) {
+            this.corner.draw(x+offset.x+w+15,y + 16+offset.y,6)
+        } else {
+            this.corner.draw(x-15+offset.x,y + 16+offset.y,5)
+        }
+        this.corner.draw(x+offset.x,y+offset.y)
+        this.corner.draw(x+w+offset.x,y+offset.y, 1)
+        this.corner.draw(x+offset.x,y+h+offset.y,2)
+        this.corner.draw(x + w+offset.x,y + h+offset.y, 3)
+        canvas.fillStyle = "black"
+        canvas.font = "20px utFont";
+        var ctext = this.curMessage.replace(/ /g,"   ")
+        printAt(canvas,ctext,x+16+offset.x,y+24+offset.y,20)
 
-
+    }
 }
 
 class BattleGimmick {
@@ -1684,6 +1729,9 @@ class Battle {
         this.gimmick = data.gimmick
         this.love = data.love
         this.music = data.music
+        for (let x = 0; x < this.enemies.length; x++) {
+            this.enemies[x].enemyNumber = x;
+        }
     }
 
     winCheck() {
@@ -1714,7 +1762,7 @@ class Undertale {
     constructor() {
         this.battle = new Battle({
             "soulMode": new SoulMode(),
-            "enemies": [new Froggit(), new MettatonEX()],
+            "enemies": [new Froggit(), new Froggit()],
             "maxHp": 20,
             "gimmick": new BattleGimmick(),
             "love": 1,
@@ -1739,6 +1787,7 @@ window.addEventListener('load', function() {
 
     loadSprites([
         "enemy/dummy",
+        "ui/textBubble",
         "ui/ut_smoke",
         "ui/_act",
         "ui/act",
