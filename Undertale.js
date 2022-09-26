@@ -115,6 +115,7 @@ function chooseFlavorText() {
 function enemyAttackDone() {
     console.log(undertale.tickables)
     if (!player.death) {
+        player.chooseSelSprite()
         battlebox.interpTo(32,250,607,385,8);
         player.collides = false;
         player.death = false;
@@ -1182,12 +1183,38 @@ class Soul extends Tickable {
         }
     }
 
+    chooseSelSprite() {
+        this.fightButton.img("ui/fight")
+                this.actButton.img("ui/act")
+                this.itemButton.img("ui/item")
+                this.mercyButton.img("ui/mercy")
+                switch (this.selectedAct) {
+                    case 0:
+                        this.fightButton.img("ui/_fight")
+                    break;
+
+                    case 1:
+                        this.actButton.img("ui/_act")
+                    break;
+
+                    case 2:
+                        this.itemButton.img("ui/_item")
+                    break;
+
+                    case 3:
+                        this.mercyButton.img("ui/_mercy")
+                    break;
+                }
+    }
+
     keyPressed(e) {
+        let clearSelection = false;
         if (!this.death) {
             this.mode.keyPressed(e)
         let h = 0;
         let v = 0;
         if (e.keyCode == 90 || e.keyCode == 13) { // Z
+            clearSelection = true;
             if (this.targetSelect) {
                 this.targetSelect = false;
                 this.attackMenu = true;
@@ -1244,14 +1271,17 @@ class Soul extends Tickable {
                     break;
 
                     case 2: // item
-                        this.selectedListItem = 0;
-                        this.itemSelect = true;
-                        this.list = []
-                        textbox.hide();
-                        for (let x in undertale.battle.items) {
-                            this.list.push(undertale.battle.items[x].name)
+                        if (undertale.battle.items.length != 0) {
+                            this.selectedListItem = 0;
+                            this.itemSelect = true;
+                            this.list = []
+                            textbox.hide();
+                            for (let x in undertale.battle.items) {
+                                this.list.push(undertale.battle.items[x].name)
+                            }
+                        } else {
+                            clearSelection = false;
                         }
-                        
                     break;
 
                     case 3: // Spare
@@ -1340,30 +1370,17 @@ class Soul extends Tickable {
         if (this.selectMenu) {
             this.selectedAct = clamp(this.selectedAct + h, 0, 3);
 
-            if (h != 0) {
+            //if (h != 0) {
                 playSound("snd_squeak.wav")
-                this.fightButton.img("ui/fight")
-                this.actButton.img("ui/act")
-                this.itemButton.img("ui/item")
-                this.mercyButton.img("ui/mercy")
-                switch (this.selectedAct) {
-                    case 0:
-                        this.fightButton.img("ui/_fight")
-                    break;
-
-                    case 1:
-                        this.actButton.img("ui/_act")
-                    break;
-
-                    case 2:
-                        this.itemButton.img("ui/_item")
-                    break;
-
-                    case 3:
-                        this.mercyButton.img("ui/_mercy")
-                    break;
-                }
-            }
+                this.chooseSelSprite();
+                
+            //}
+        }
+        if (clearSelection) {
+            this.fightButton.img("ui/fight")
+            this.actButton.img("ui/act")
+            this.itemButton.img("ui/item")
+            this.mercyButton.img("ui/mercy")
         }
     }
     }
