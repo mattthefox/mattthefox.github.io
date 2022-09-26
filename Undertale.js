@@ -144,6 +144,7 @@ function enemyAttackDone() {
 }
 
 function playerActDone() {
+    textbox.hide()
     for (let x in undertale.battle.enemies) {
         undertale.battle.enemies[x].attack()
     }
@@ -406,6 +407,7 @@ class Sprite {
     image;
     loaded = false;
     prevLoaded = false;
+    scale = new Vector2(1,1);
 
     constructor(file, num = 1) {
         this.num = num;
@@ -438,7 +440,13 @@ class Sprite {
                     canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(100 - (this.disintegrateTime * 4), 0)),2)
                 }
             } else {
-                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
+                canvas.save()
+                if (this.scale.x < 0) {
+                    canvas.scale(-1,1)
+                    canvas.translate(-640,0)
+                }
+                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w * Math.abs(this.scale.x),this.image.naturalHeight * Math.abs(this.scale.y));
+                canvas.restore()
             }
         }
         
@@ -768,7 +776,7 @@ class Froggit extends Enemy {
 
 class MettatonEX extends Enemy {
     mercy = 0;
-    maxHp = 18;
+    maxHp = 120;
     name = "Mettaton EX"
     acts = [
         {"name": "Check", "func": this.actCheck}
@@ -777,12 +785,22 @@ class MettatonEX extends Enemy {
         "Smells like Mettaton."
     ]
     description = "It's an enemy. Wow."
-    face = new Sprite("enemy/mex_body",1);
-    body = new Sprite('enemy/froggit_body',2)
-    x = 128;
-    y = 64;
+    body = new Sprite("enemy/mex_body",6);
+    face = new Sprite('enemy/mex_face',13)
+    armL = new Sprite("enemy/mex_arms",6)
+    armR = new Sprite("enemy/mex_arms",6)
+    x = 270;
+    y = 32;
     frameNorm = 0;
     frameSpareDeath = 1;
+    pose = 1;
+
+    init() {
+        this.body.scale = new Vector2(2,2);
+        this.face.scale = new Vector2(2,2)
+        this.armL.scale = new Vector2(2,2)
+        this.armR.scale = new Vector2(-2,2)
+    }
 
     actBeg(self) {
         if (self.mercy.inRange(0,24)) {
@@ -820,9 +838,24 @@ class MettatonEX extends Enemy {
     }
 
     deferredRender() {
-        let f = Math.round((globalTime) * 2 % 2)
-        this.face.draw(this.x + this.xOffset + Math.sin(this.spriteTime * .1) * 5,this.y + Math.sin(this.spriteTime * .2) * 2,f)
-        this.body.draw(this.x + this.xOffset * 2,this.y + 62,f)
+        let b;
+        switch (this.pose) {
+            case 0: // crouch
+                b = new Vector2(this.x - 32 + this.xOffset + (Math.sin(this.spriteTime * .25) * 1),this.y + 62 + (Math.cos(this.spriteTime * .25) * 1))
+                this.armL.draw(b.x - 28,b.y,this.frame)
+                this.armR.draw(-b.x + 460,b.y,this.frame)
+                this.body.draw(b.x,b.y,this.frame)
+                this.face.draw(this.x + this.xOffset,this.y + Math.sin(this.spriteTime * .25) * 1.5,this.frame)
+            break;
+
+            case 1: // to the sky
+                b = new Vector2(this.x - 32 + this.xOffset + (Math.sin(this.spriteTime * .25) * 1),this.y + 62 + (Math.cos(this.spriteTime * .25) * 1))
+                this.armL.draw(b.x + 30,b.y - 100,5)
+                this.armR.draw(-b.x + 490,b.y - 56,2)
+                this.body.draw(b.x,b.y,0)
+                this.face.draw(this.x + this.xOffset,this.y + Math.sin(this.spriteTime * .25) * 1.5,12)
+            break;
+        }
     }
 
     attack() {
@@ -1681,7 +1714,7 @@ class Undertale {
     constructor() {
         this.battle = new Battle({
             "soulMode": new SoulMode(),
-            "enemies": [new MettatonEX()],
+            "enemies": [new Froggit(), new MettatonEX()],
             "maxHp": 20,
             "gimmick": new BattleGimmick(),
             "love": 1,
@@ -1723,7 +1756,10 @@ window.addEventListener('load', function() {
         "enemy/froggit_body",
         "enemy/froggit_face",
         "ui/attackbar_indi1",
-        "ui/attackbar_indi2"
+        "ui/attackbar_indi2",
+        "enemy/mex_body",
+        "enemy/mex_face",
+        "enemy/mex_arms"
     ], spritesLoaded)
 
     function spritesLoaded() {
