@@ -15,6 +15,13 @@ var loadIndicator;
 var backButton;
 var playerDamageMultiplier;
 var globalTime = 0;
+var timeDilation = 1;
+
+var battles = [
+    {
+
+    }
+]
 
 var vertKey = 0;
 var horzKey = 0;
@@ -339,8 +346,8 @@ class BasicHealingItem extends Item {
 
     onUse() {
         console.log(this.hp);
-        player.hp = Math.min(player.hp + this.hp,undertale.battle.maxHp)
-        if (player.hp >= undertale.battle.maxHp) {
+        player.hp = Math.min(player.hp + this.hp,player.maxHp)
+        if (player.hp >= player.maxHp) {
             if (undertale.battle.seriousMode) {
                 this.message = "\n*Your HP were maxed out."
             } else {
@@ -435,8 +442,10 @@ class Sprite {
         canvas.translate(-localOrigin.x, -localOrigin.y);
 
         if (this.image.complete) {
+            
             let w = this.image.naturalWidth / this.num
             if (this.disintegrating) {
+                //this.disintegrateTime += .1
                 canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
                 // Fade out while it disintegrates +Math.max(30 / this.disintegrateTime,0)+
                 canvas.fillStyle = "rgba(0,0,0,"+Math.max(this.disintegrateTime/10,0)+")"
@@ -446,6 +455,12 @@ class Sprite {
                     this.disintegrate[d].y -= Math.random() * 4
                     canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(100 - (this.disintegrateTime * 4), 0)),2)
                 }
+                /*
+                for (let a = 0; a < this.image.naturalHeight; a++) {
+                    let b = (this.disintegrateTime+1) * a - this.disintegrateTime * 80
+                    canvas.drawImage(this.image,frame * w,a,w,1,x,y + b,w * Math.abs(this.scale.x),Math.abs(this.scale.y));
+                }*/
+                
             } else {
                 canvas.save()
                 if (this.scale.x < 0) {
@@ -507,7 +522,7 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
 
 class Enemy extends Tickable {
     mercy = 0;
-    maxHp = 18;
+    maxHp = 1;
     name = "Enemy"
     acts = [
         {"name": "Check", "func": this.actCheck}
@@ -526,7 +541,6 @@ class Enemy extends Tickable {
     constructor() {
         super()
         this.priority = 5;
-        this.hp = this.maxHp;
         this.visualMercy = this.mercy;
         this.visualHp = this.maxhp;
         this.drawHealthBar = false;
@@ -543,6 +557,7 @@ class Enemy extends Tickable {
     }
 
     init() {
+        this.hp = this.maxHp;
         this.x = this.x + (this.enemyNumber * 160)
     }
 
@@ -708,7 +723,7 @@ class Enemy extends Tickable {
 
 class Froggit extends Enemy {
     mercy = 0;
-    maxHp = 18;
+    maxHp = 15;
     name = "Froggit"
     acts = [
         {"name": "Check", "func": this.actCheck},
@@ -777,9 +792,15 @@ class Froggit extends Enemy {
     }
 
     testAttack() {
+        var q = Math.round(Math.random()*16 + 1)
+        console.log(q)
         new AttackFactory(() => {
-            for (let x = 0;x < 5; x++) {
-                new Bullet("soul",320+(x*16),240,5,function(){this.y += 2})
+            for (let x = 0;x < q; x++) {
+                let p = x % 2 == 0 ? 1 : -1
+                new Bullet("soul",240+(x*(256/q)),200,5,function(){
+                    this.y += 2 + Math.sin(x)
+                    this.x = 240 + (x*(256/q)) + Math.sin(globalTime * .03) * p * 64
+                })
             }
         },3)
     }
@@ -943,6 +964,11 @@ class Bullet extends Tickable {
 
     movement() {}
 
+    destroy() {
+        undertale.tickables.splice(undertale.tickables.indexOf(this),1);
+        undertale.collision.splice(undertale.collision.indexOf(this.collision),1);
+    }
+
     tick() {
         this.time += 1;
         this.movement()
@@ -1093,11 +1119,13 @@ class Soul extends Tickable {
     drawUi = true;
     drawSoul = true;
     selectedActTarget = 0;
+    
 
     constructor() {
         super();
         this.mode = new SoulMode(this);
-        this.hp = undertale.battle.maxHp;
+        this.maxHp = ((undertale.love-1) * 3.78) + 20
+        this.hp = this.maxHp
         this.selectedAct = 0;
         this.fightButton = new Sprite("ui/_fight")
         this.actButton = new Sprite("ui/act")
@@ -1219,7 +1247,7 @@ class Soul extends Tickable {
                 this.targetSelect = false;
                 this.attackMenu = true;
                 this.drawSoul = false;
-                undertale.spawn(new AttackBar(5 + ((undertale.battle.love-1) * 56)))
+                undertale.spawn(new AttackBar(5 + ((undertale.love-1) * 56)))
             } else if (this.actTargetSelect) {
                 this.selectedActTarget = this.selectedListItem;
                 this.selectedListItem = 0;
@@ -1403,16 +1431,16 @@ class Soul extends Tickable {
         canvas.fillStyle = "maroon";
         canvas.fillRect(275,400,28,19)
         canvas.fillStyle = "yellow";
-        canvas.fillRect(275,400,(this.hp / undertale.battle.maxHp) * 28,19)
+        canvas.fillRect(275,400,(this.hp / this.maxHp) * 28,19)
         canvas.fillStyle = "white"
         canvas.font = "14px menuFont";
         canvas.fillText("you",30,418)
-        canvas.fillText("LV "+undertale.battle.love,132,418)
+        canvas.fillText("LV "+undertale.love,132,418)
         canvas.font = "10px menuFont";
         canvas.fillText("HP",248,415)
         canvas.font = "14px menuFont";
         canvas.fillText(this.hp,320,418)
-        canvas.fillText(undertale.battle.maxHp,385,418)
+        canvas.fillText(this.maxHp,385,418)
         this.battleSlash.draw(358,406)
         canvas.font = "32px utFont";
 
@@ -1591,6 +1619,7 @@ class TypingText extends Tickable {
         this.curLetter = 0;
         this.curMessage = ""
         this.prevMessage = message;
+        this.pressedo = false;
     }
 
     init() {
@@ -1608,20 +1637,24 @@ class TypingText extends Tickable {
     }
 
     keyPressed(e) {
-        if (e.keyCode == 90 || e.keyCode == 13) { // Z
-            if (this.curLetter >= this.message.length) {
-                this.confirmed();
+        if (!this.pressedo) {
+            if (e.keyCode == 90 || e.keyCode == 13) { // Z
+                if (this.curLetter >= this.message.length) {
+                    this.confirmed();
+                    this.pressedo = true;
+                }
+            } else
+            if (e.keyCode == 88 || e.keyCode == 16) {
+                this.curLetter = this.message.length
+                this.curMessage = this.message;
             }
-        } else
-        if (e.keyCode == 88 || e.keyCode == 16) {
-            this.curLetter = this.message.length
-            this.curMessage = this.message;
         }
     }
 
     confirmed() {}
 
     hide() {
+        this.pressedo = false;
         this.prevMessage = this.message;
         this.message = ""
         this.curMessage = ""
@@ -1630,10 +1663,12 @@ class TypingText extends Tickable {
     }
 
     show() {
+        this.pressedo = false;
         this.message = this.prevMessage;
     }
 
     setMessage(message) {
+        this.pressedo = false;
         this.prevMessage = message;
         this.message = message;
         this.curMessage = ""
@@ -1735,17 +1770,18 @@ class Battle {
         CinnaBun
     ]
     seriousMode = false;
+    data;
     constructor(data) {
+        this.data = data;
         this.BattleDatatoVars(data)
     }
 
     BattleDatatoVars(data) {
-        this.initialSoulMode = data.soulMode
+        this.initialSoulMode = data.soulMode ? data.soulMode : new SoulMode()
         this.enemies = data.enemies
-        this.maxHp = data.maxHp
-        this.gimmick = data.gimmick
-        this.love = data.love
-        this.music = data.music
+        this.gimmick = data.gimmick ? data.gimmick : new BattleGimmick()
+        this.love = data.love ? data.love : 0;
+        this.music = data.music ? data.music : "enemy.mp3"
         for (let x = 0; x < this.enemies.length; x++) {
             this.enemies[x].enemyNumber = x;
         }
@@ -1776,15 +1812,18 @@ class Battle {
 class Undertale {
     tickables = []
     collision = []
+    love = 1;
     constructor() {
-        this.battle = new Battle({
+        this.startBattle({
             "soulMode": new SoulMode(),
             "enemies": [new Froggit(), new Froggit()],
-            "maxHp": 20,
             "gimmick": new BattleGimmick(),
-            "love": 1,
             "music": "enemy.mp3"
-        });
+        })
+    }
+
+    startBattle(data) {
+        this.battle = new Battle(data);
         playSound(this.battle.music, true)
         for (let x in this.battle.enemies) {
             this.spawn(this.battle.enemies[x]);
@@ -1985,7 +2024,7 @@ window.addEventListener('load', function() {
     canvas.imageSmoothingQuality = "low"
     undertale = new Undertale();
     setInterval(function() {
-        globalTime += 1;
+        globalTime += timeDilation;
         for (let m in undertale.tickables) {
             undertale.tickables[m].beginTick();
             undertale.tickables[m].tick();
@@ -2007,7 +2046,7 @@ window.addEventListener('load', function() {
                 }
             }
         }
-    },33)
+    },33 * (1/timeDilation))
     masterTick = new MasterTick()
     masterTick.priority = 0
     undertale.spawn(masterTick)
