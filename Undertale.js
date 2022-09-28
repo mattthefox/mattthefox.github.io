@@ -1,6 +1,7 @@
 var undertale;
 var player;
 var canvas;
+var canvasElement;
 var battlebox;
 var textbox;
 var bullets;
@@ -183,15 +184,19 @@ canvas = document.querySelector('canvas');
 var utFont = new FontFace('utFont', 'url(./DeterminationMono.ttf)');
 var menuFont = new FontFace('menuFont','url(./MenuFont.otf)')
 var damageFont = new FontFace('damageFont','url(./DamageFont.ttf)')
+var bubbleFont = new FontFace("bubbleFont","url(./dotumche-pixel.ttf")
 
 utFont.load().then(function(font){
   document.fonts.add(font);
   menuFont.load().then(function(font){
     document.fonts.add(font);
     damageFont.load().then(function(font){
-        console.log("Fonts Loaded")
         document.fonts.add(font);
-        fontLoaded = true;
+        bubbleFont.load().then(function(font){
+            document.fonts.add(font);
+            console.log("Fonts Loaded")
+            fontLoaded = true;
+        })
       });
   });
 });
@@ -1747,8 +1752,8 @@ class TextBubble extends Tickable {
         this.corner.draw(x+offset.x,y+h+offset.y,2)
         this.corner.draw(x + w+offset.x,y + h+offset.y, 3)
         canvas.fillStyle = "black"
-        canvas.font = "20px utFont";
-        var ctext = this.curMessage.replace(/ /g,"   ")
+        canvas.font = "12px bubbleFont";
+        var ctext = this.curMessage
         printAt(canvas,ctext,x+16+offset.x,y+24+offset.y,20)
 
     }
@@ -1780,7 +1785,7 @@ class Battle {
         this.initialSoulMode = data.soulMode ? data.soulMode : new SoulMode()
         this.enemies = data.enemies
         this.gimmick = data.gimmick ? data.gimmick : new BattleGimmick()
-        this.love = data.love ? data.love : 0;
+        this.love = data.love ? data.love : 1;
         this.music = data.music ? data.music : "enemy.mp3"
         for (let x = 0; x < this.enemies.length; x++) {
             this.enemies[x].enemyNumber = x;
@@ -1814,20 +1819,33 @@ class Undertale {
     collision = []
     love = 1;
     constructor() {
-        this.startBattle({
-            "soulMode": new SoulMode(),
-            "enemies": [new Froggit(), new Froggit()],
-            "gimmick": new BattleGimmick(),
-            "music": "enemy.mp3"
-        })
     }
 
     startBattle(data) {
+        if (this.battle) { // if a previous battle has existed
+            let kill = []
+            for (let x in this.battle.data.enemies) {
+                kill.push(this.battle.data.enemies[x])
+            }
+            for (let x in kill) {
+                kill[x].destroy()
+            }
+        }
         this.battle = new Battle(data);
         playSound(this.battle.music, true)
         for (let x in this.battle.enemies) {
             this.spawn(this.battle.enemies[x]);
         }
+        masterTick = new MasterTick()
+        masterTick.priority = 0
+        this.spawn(masterTick)
+        player = new Soul();
+        this.spawn(player)
+        battlebox = new BattleBox()
+        this.spawn(battlebox)
+        textbox = new TypingText("")
+        chooseFlavorText();
+        this.spawn(textbox)
     }
 
     spawn(actor) {
@@ -1890,6 +1908,7 @@ window.addEventListener('load', function() {
         let throbber = document.getElementById("throbber")
     throbber.style.display = "none"
     loadIndicator.style.display = "none"
+    canvasElement = document.getElementById("undertale")
     canvas = document.getElementById("undertale").getContext('2d')
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
@@ -2022,7 +2041,17 @@ window.addEventListener('load', function() {
     canvas.mozImageSmoothingEnabled = false
     canvas.webkitImageSmoothingEnabled = false
     canvas.imageSmoothingQuality = "low"
+
+    //To start the game
+    /*
+    canvasElement.style.display = "block"
     undertale = new Undertale();
+    undertale.startBattle({
+        "soulMode": new SoulMode(),
+        "enemies": [new Froggit(), new Froggit()],
+        "gimmick": new BattleGimmick(),
+        "music": "enemy.mp3"
+    })
     setInterval(function() {
         globalTime += timeDilation;
         for (let m in undertale.tickables) {
@@ -2047,17 +2076,7 @@ window.addEventListener('load', function() {
             }
         }
     },33 * (1/timeDilation))
-    masterTick = new MasterTick()
-    masterTick.priority = 0
-    undertale.spawn(masterTick)
-    player = new Soul();
-    undertale.spawn(player)
-    battlebox = new BattleBox()
-    undertale.spawn(battlebox)
-    textbox = new TypingText("")
-    chooseFlavorText();
-    undertale.spawn(textbox)
-    //battlebox.interpTo(250,220,400,395)
+    */
 }
 })
 
