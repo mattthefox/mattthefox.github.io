@@ -17,12 +17,7 @@ var backButton;
 var playerDamageMultiplier;
 var globalTime = 0;
 var timeDilation = 1;
-
-var battles = [
-    {
-
-    }
-]
+var enemiesSlot;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -908,6 +903,151 @@ class MettatonEX extends Enemy {
     }
 }
 
+// === //
+// Battles and Enemies List
+var storyModeBattles = [
+    // Ruins
+    {
+        "enemies": [Froggit]
+    },
+    {
+        "enemies": [Froggit, Froggit] // Froggit, whimsum
+    },
+    {
+        "enemies": [Froggit, Froggit] // Froggit (x2)
+    },
+    {
+        "enemies": [Froggit, Froggit] // Loox (x2)
+    },
+    {
+        "enemies": [Froggit, Froggit] // Moldsmal (x3)
+    },
+    {
+        "enemies": [Froggit, Froggit] // Moldsmal, Migosp
+    },
+    {
+        "enemies": [Froggit] // Napstablook
+    },
+    {
+        "enemies": [Froggit, Froggit] // Vegetoid (x2)
+    },
+    {
+        "enemies": [Froggit] // Toriel
+    },
+    // Snowdin
+    {
+        "enemies": [Froggit] // Snowdrake
+    },
+    {
+        "enemies": [Froggit] // Icecap
+    },
+    {
+        "enemies": [Froggit] // Icecap, Snowdrake
+    },
+    {
+        "enemies": [Froggit] // Gyftrot
+    },
+    {
+        "enemies": [Froggit] // Snowdrake, Icecap, jerry
+    },
+    {
+        "enemies": [Froggit] // Papyrus
+    },
+    // Waterfall
+    {
+        "enemies": [Froggit] // Aaron
+    },
+    {
+        "enemies": [Froggit] // Aaron, Woshua
+    },
+    {
+        "enemies": [Froggit] // Shyren
+    },
+    {
+        "enemies": [Froggit] // Temmie
+    },
+    {
+        "enemies": [Froggit] // Mad Dummy
+    },
+    {
+        "enemies": [Froggit] // Undyne (or Undying)
+    },
+    // Hotland
+    {
+        "enemies": [Froggit] // Vulkin
+    },
+    {
+        "enemies": [Froggit] // Tsundereplane
+    },
+    {
+        "enemies": [Froggit] // Pyrope
+    },
+    {
+        "enemies": [Froggit] // Mettaton Quiz
+    },
+    {
+        "enemies": [Froggit] // RG 01 and RG 02
+    },
+    // Core
+    {
+        "enemies": [Froggit] // Madjick, Knight Knight
+    },
+    {
+        "enemies": [Froggit] // Final Froggit, Whimsalot
+    },
+    {
+        "enemies": [Froggit] // Astigmatism
+    },
+    {
+        "enemies": [Froggit] // Final Froggit, Whimsalot, Astigmatism (What a nightmare!)
+    },
+    {
+        "enemies": [Froggit] // Mettaton EX
+    },
+    // New Home
+    {
+        "enemies": [Froggit], // Sans
+        "genocide": true
+    },
+    {
+        "enemies": [Froggit] // Asgore
+    },
+    {
+        "enemies": [Froggit] // Omega Flowey (Has his own gimmick)
+    },
+    // True Lab
+    {
+        "enemies": [Froggit], // Memoryhead (x3)
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Endogeny
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Reaper Bird
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Lemon Bread
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Snowdrake's Mother
+        "pacifist": true
+    },
+    // True Pacifist
+    {
+        "enemies": [Froggit], // Asriel Dreemur
+        "pacifist": true
+    },
+]
+
+var enemiesList = {
+    Froggit
+}
+
+
 class SpareDust extends Tickable {
     x;
     y;
@@ -1776,6 +1916,7 @@ class Battle {
     ]
     seriousMode = false;
     data;
+    enemies = []
     constructor(data) {
         this.data = data;
         this.BattleDatatoVars(data)
@@ -1783,7 +1924,9 @@ class Battle {
 
     BattleDatatoVars(data) {
         this.initialSoulMode = data.soulMode ? data.soulMode : new SoulMode()
-        this.enemies = data.enemies
+        for (let x in data.enemies) {
+            this.enemies.push(new data.enemies[x])
+        }
         this.gimmick = data.gimmick ? data.gimmick : new BattleGimmick()
         this.love = data.love ? data.love : 1;
         this.music = data.music ? data.music : "enemy.mp3"
@@ -1856,8 +1999,22 @@ class Undertale {
     }
 }
     
-window.addEventListener('load', function() {
-    loadIndicator = document.getElementById("loadIndicator");
+function addSelectBox() {
+    let newEnemy = document.createElement("select");
+        newEnemy.style.display = "block"
+        for (let x in enemiesList) {
+            let thisName = "";
+            let option = document.createElement("option");
+            option.innerHTML = enemiesList[x].name;
+            newEnemy.appendChild(option)
+        }
+        enemiesSlot.appendChild(newEnemy)
+}
+
+function startGame(battleData) {
+    let throbber = document.getElementById("throbber")
+    loadIndicator.style.display = "block";
+    throbber.style.display = "block";
 
     loadSprites([
         "enemy/dummy",
@@ -1905,7 +2062,7 @@ window.addEventListener('load', function() {
     }
 
     function audioLoaded() {
-        let throbber = document.getElementById("throbber")
+        
     throbber.style.display = "none"
     loadIndicator.style.display = "none"
     canvasElement = document.getElementById("undertale")
@@ -2043,7 +2200,278 @@ window.addEventListener('load', function() {
     canvas.imageSmoothingQuality = "low"
 
     //To start the game
+    
+    canvasElement.style.display = "block"
+    undertale = new Undertale();
+    undertale.startBattle(battleData)
+    setInterval(function() {
+        globalTime += timeDilation;
+        for (let m in undertale.tickables) {
+            undertale.tickables[m].beginTick();
+            undertale.tickables[m].tick();
+            undertale.tickables[m].checkCollision();
+            undertale.tickables[m].endTick();
+            undertale.tickables[m].render();
+        }
+        if (debugCollision) {
+            for (let m in undertale.collision) {
+                let c = undertale.collision[m]
+                canvas.fillStyle = "rgba(255,0,0,0.5)";
+                if (c.inner) {
+                    canvas.fillRect(c.x,c.y,(c.x1-c.x),(c.y1-c.y))
+                } else {
+                    canvas.fillRect(0,0,640,c.y)
+                    canvas.fillRect(0,c.y,c.x,480)
+                    canvas.fillRect(c.x,c.y1,c.x1,c.y1-c.y)
+                    canvas.fillRect(c.x1,c.y,640,480)
+                }
+            }
+        }
+    },33 * (1/timeDilation))
+    
+}
+}
+
+window.addEventListener('load', function() {
+    enemiesSlot = document.getElementById("enemiesList")
+    let presetSelect = document.getElementById("presetSelect");
+    let gimmickSelect = document.getElementById("gimmickSelect");
+    let enemySelect = document.getElementById("enemySelect");
+    let addEnemy = document.getElementById("addEnemy")
+    let customBegin = document.getElementById("customBegin")
+    let mainMenu = document.getElementById("mainMenu")
+
+    addSelectBox()
+    addEnemy.onclick = function(e) {
+        addSelectBox()
+    }
+
+    customBegin.onclick = function(e) {
+        let enemiesResult = [];
+        let gimmicks = [ // @todo add battle gimmicks.
+            BattleGimmick,
+            BattleGimmick,
+            BattleGimmick,
+            BattleGimmick,
+            BattleGimmick,
+        ]
+        let soulModes = [
+            SoulMode,
+            SoulModeBlue,
+            SoulMode, // green
+            SoulModePurple,
+            SoulModeYellow,
+            SoulMode, // cyan
+            SoulMode // orange
+        ]
+        for (const child of enemiesSlot.children) {
+            enemiesResult.push(enemiesList[child.value])
+        }
+        mainMenu.style.display = "none"
+        /*
+        <option>No Gimmick</option>
+                    <option>KARMA mechanic (Sans)</option>
+                    <option>No I-frames</option>
+                    <option>No MERCY (Asgore)</option>
+                    <option>Insta Kill</option>
+        */
+        startGame({
+            "enemies": enemiesResult
+        })
+    }
+
+    loadIndicator = document.getElementById("loadIndicator");
+
     /*
+    let throbber = document.getElementById("throbber")
+    loadIndicator.style.display = "block";
+    throbber.style.display = "block";
+
+    loadSprites([
+        "enemy/dummy",
+        "ui/textBubble",
+        "ui/ut_smoke",
+        "ui/_act",
+        "ui/act",
+        "ui/_fight",
+        "ui/fight",
+        "ui/_item",
+        "ui/item",
+        "ui/_mercy",
+        "ui/mercy",
+        "ui/attackbar",
+        "battle_slash",
+        "soul_dead",
+        "soul_shard",
+        "soul",
+        "enemy/froggit_body",
+        "enemy/froggit_face",
+        "ui/attackbar_indi1",
+        "ui/attackbar_indi2",
+        "enemy/mex_body",
+        "enemy/mex_face",
+        "enemy/mex_arms"
+    ], spritesLoaded)
+
+    function spritesLoaded() {
+        loadAudio([
+            "enemy.mp3",
+            "hurt.wav",
+            "snd_dbreak.wav",
+            "snd_dbreak2.wav",
+            "snd_heartshot.wav",
+            "snd_select.wav",
+            "snd_squeak.wav",
+            "SND_TXT2.wav",
+            "snd_damage.wav",
+            "monsterdust.wav"
+        ], audioLoaded)
+    }
+
+    function lol() {
+
+    }
+
+    function audioLoaded() {
+        
+    throbber.style.display = "none"
+    loadIndicator.style.display = "none"
+    canvasElement = document.getElementById("undertale")
+    canvas = document.getElementById("undertale").getContext('2d')
+    joystick = document.getElementById("joystickBack")
+    confirmButton = document.getElementById("confirmButton")
+    backButton = document.getElementById("backButton")
+    let initialMousePosX;
+    let initialMousePosY;
+    let mouseX;
+    let mouseY;
+    let joystickDown = false;
+
+    confirmButton.onclick = function() {
+        document.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "z",
+              keyCode: 90, // example values.
+              code: "KeyZ", // put everything you need in this object.
+              which: 90,
+              shiftKey: false, // you don't need to include values
+              ctrlKey: false,  // if you aren't going to use them.
+              metaKey: false   // these are here for example's sake.
+            })
+          );
+    }
+
+    backButton.onclick = function() {
+        document.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "X",
+              keyCode: 88, // example values.
+              code: "KeyX", // put everything you need in this object.
+              which: 88,
+              shiftKey: false, // you don't need to include values
+              ctrlKey: false,  // if you aren't going to use them.
+              metaKey: false   // these are here for example's sake.
+            })
+          );
+    }
+
+    joystick.ontouchstart = function(event) {
+        console.log("as")
+        joystickDown = true;
+        initialMousePosX = event.targetTouches[0].pageX;
+        initialMousePosY = event.targetTouches[0].pageY;
+        for (let i in undertale.tickables) {
+            undertale.tickables[i].keyPressed(event)
+        }
+    }
+
+    joystick.ontouchend = function(event) {
+        joystickDown = false;
+        let keys = [
+            {name: "ArrowDown", code: 40},
+            {name: "ArrowUp", code: 38},
+            {name: "ArrowRight", code: 39},
+            {name: "ArrowLeft", code: 37},
+        ]
+        let which = -1;
+
+        if (horzKey < 0) {
+            console.log("left")
+            which = 3;
+        } else if (horzKey > 0) {
+            which = 2;
+        } else {
+            which = -1
+        }
+        if (which != -1) {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                key: keys[which].name,
+                keyCode: keys[which].code, // example values.
+                code: keys[which].name, // put everything you need in this object.
+                which: keys[which].code,
+                shiftKey: false, // you don't need to include values
+                ctrlKey: false,  // if you aren't going to use them.
+                metaKey: false   // these are here for example's sake.
+                })
+            );
+        }
+
+        if (vertKey < 0) {
+            which = 1;
+        } else if (vertKey > 0) {
+            which = 0;
+        } else {
+            which = -1
+        }
+        if (which != -1) {
+            document.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                key: keys[which].name,
+                keyCode: keys[which].code, // example values.
+                code: keys[which].name, // put everything you need in this object.
+                which: keys[which].code,
+                shiftKey: false, // you don't need to include values
+                ctrlKey: false,  // if you aren't going to use them.
+                metaKey: false   // these are here for example's sake.
+                })
+            );
+        }
+
+        horzKey = 0;
+        vertKey = 0;
+
+
+        for (let i in undertale.tickables) {
+            undertale.tickables[i].keyReleased(event)
+        }
+    }
+
+    document.ontouchmove = function(event) {
+        mouseX = event.targetTouches[0].pageX
+        mouseY = event.targetTouches[0].pageY
+        let sensitivity = 25;
+        if (joystickDown) {
+            if (mouseX - initialMousePosX > -sensitivity && mouseX - initialMousePosX < sensitivity) {
+                horzKey = 0;
+            } else {
+                horzKey = Math.sign(mouseX - initialMousePosX)
+            }
+            if (mouseY - initialMousePosY > -sensitivity && mouseY - initialMousePosY < sensitivity) {
+                vertKey = 0;
+            } else {
+                vertKey = Math.sign(mouseY - initialMousePosY)
+            }
+        }
+    }
+
+    canvas.imageSmoothingEnabled = false;
+    canvas.mozImageSmoothingEnabled = false
+    canvas.webkitImageSmoothingEnabled = false
+    canvas.imageSmoothingQuality = "low"
+
+    //To start the game
+    
     canvasElement.style.display = "block"
     undertale = new Undertale();
     undertale.startBattle({
@@ -2076,8 +2504,10 @@ window.addEventListener('load', function() {
             }
         }
     },33 * (1/timeDilation))
-    */
-}
+    
+}*/
 })
+
+
 
 export {Sprite, Tickable, undertale, player}
