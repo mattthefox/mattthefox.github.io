@@ -1227,18 +1227,20 @@ class SoulModePurple extends SoulMode {
     jumpTimer = 0;
     touchingGround;
     line = 0;
-    moveCooldown = false
+    moveCooldown = 0
+    dir = 0;
 
     tick() {
         if (!this.owner.death) {
             this.owner.x += horzKey * 2;
         }
-        if (!this.moveCooldown) {
-                this.owner.y += vertKey * 64
-                this.moveCooldown = true
+        if (vertKey != 0 && this.moveCooldown == 0) {
+            this.dir = Math.sign(vertKey);
+            this.moveCooldown = 5
         }
-        if (vertKey == 0) {
-            this.moveCooldown = false;
+        if (this.moveCooldown != 0) {
+                this.owner.y += 12.8 * this.dir
+                this.moveCooldown -= 1;
         }
     }
 
@@ -1268,7 +1270,8 @@ class Soul extends Tickable {
 
     constructor() {
         super();
-        this.mode = new SoulMode(this);
+        this.mode = undertale.battle.initialSoulMode
+        this.mode.owner = this;
         this.maxHp = ((undertale.love-1) * 3.78) + 20
         this.hp = this.maxHp
         this.selectedAct = 0;
@@ -1923,7 +1926,7 @@ class Battle {
     }
 
     BattleDatatoVars(data) {
-        this.initialSoulMode = data.soulMode ? data.soulMode : new SoulMode()
+        this.initialSoulMode = data.soulMode ? new data.soulMode : new SoulMode()
         for (let x in data.enemies) {
             this.enemies.push(new data.enemies[x])
         }
@@ -2001,14 +2004,20 @@ class Undertale {
     
 function addSelectBox() {
     let newEnemy = document.createElement("select");
+        let removeButton;
         newEnemy.style.display = "block"
         for (let x in enemiesList) {
-            let thisName = "";
             let option = document.createElement("option");
+            option.style.display = "inline-block"
+            removeButton = document.createElement("a");
+            removeButton.innerHTML = "[-]"
+            removeButton.className += " button"
+            removeButton.style.display = "inline-block"
             option.innerHTML = enemiesList[x].name;
             newEnemy.appendChild(option)
         }
         enemiesSlot.appendChild(newEnemy)
+        //enemiesSlot.appendChild(removeButton)
 }
 
 function startGame(battleData) {
@@ -2070,6 +2079,10 @@ function startGame(battleData) {
     joystick = document.getElementById("joystickBack")
     confirmButton = document.getElementById("confirmButton")
     backButton = document.getElementById("backButton")
+
+    confirmButton.style.display="block"
+    joystick.style.display="block"
+    backButton.style.display="block"
     let initialMousePosX;
     let initialMousePosY;
     let mouseX;
@@ -2234,19 +2247,20 @@ function startGame(battleData) {
 
 window.addEventListener('load', function() {
     enemiesSlot = document.getElementById("enemiesList")
-    let presetSelect = document.getElementById("presetSelect");
-    let gimmickSelect = document.getElementById("gimmickSelect");
-    let enemySelect = document.getElementById("enemySelect");
-    let addEnemy = document.getElementById("addEnemy")
-    let customBegin = document.getElementById("customBegin")
-    let mainMenu = document.getElementById("mainMenu")
+    const PRESET_SELECT = document.getElementById("presetSelect");
+    const GIMMICK_SELECT = document.getElementById("gimmickSelect");
+    const SOULMODE_SELECT = document.getElementById("soulModeSelect");
+    const ENEMY_SELECT = document.getElementById("enemySelect");
+    const ENEMY_ADDER = document.getElementById("addEnemy")
+    const CUSTOM_BEGIN = document.getElementById("customBegin")
+    const MAIN_MENU = document.getElementById("mainMenu")
 
     addSelectBox()
-    addEnemy.onclick = function(e) {
+    ENEMY_ADDER.onclick = function(e) {
         addSelectBox()
     }
 
-    customBegin.onclick = function(e) {
+    CUSTOM_BEGIN.onclick = function(e) {
         let enemiesResult = [];
         let gimmicks = [ // @todo add battle gimmicks.
             BattleGimmick,
@@ -2267,245 +2281,14 @@ window.addEventListener('load', function() {
         for (const child of enemiesSlot.children) {
             enemiesResult.push(enemiesList[child.value])
         }
-        mainMenu.style.display = "none"
-        /*
-        <option>No Gimmick</option>
-                    <option>KARMA mechanic (Sans)</option>
-                    <option>No I-frames</option>
-                    <option>No MERCY (Asgore)</option>
-                    <option>Insta Kill</option>
-        */
+        MAIN_MENU.style.display = "none"
         startGame({
-            "enemies": enemiesResult
+            "enemies": enemiesResult,
+            "soulMode": soulModes[SOULMODE_SELECT.selectedIndex]
         })
     }
 
     loadIndicator = document.getElementById("loadIndicator");
-
-    /*
-    let throbber = document.getElementById("throbber")
-    loadIndicator.style.display = "block";
-    throbber.style.display = "block";
-
-    loadSprites([
-        "enemy/dummy",
-        "ui/textBubble",
-        "ui/ut_smoke",
-        "ui/_act",
-        "ui/act",
-        "ui/_fight",
-        "ui/fight",
-        "ui/_item",
-        "ui/item",
-        "ui/_mercy",
-        "ui/mercy",
-        "ui/attackbar",
-        "battle_slash",
-        "soul_dead",
-        "soul_shard",
-        "soul",
-        "enemy/froggit_body",
-        "enemy/froggit_face",
-        "ui/attackbar_indi1",
-        "ui/attackbar_indi2",
-        "enemy/mex_body",
-        "enemy/mex_face",
-        "enemy/mex_arms"
-    ], spritesLoaded)
-
-    function spritesLoaded() {
-        loadAudio([
-            "enemy.mp3",
-            "hurt.wav",
-            "snd_dbreak.wav",
-            "snd_dbreak2.wav",
-            "snd_heartshot.wav",
-            "snd_select.wav",
-            "snd_squeak.wav",
-            "SND_TXT2.wav",
-            "snd_damage.wav",
-            "monsterdust.wav"
-        ], audioLoaded)
-    }
-
-    function lol() {
-
-    }
-
-    function audioLoaded() {
-        
-    throbber.style.display = "none"
-    loadIndicator.style.display = "none"
-    canvasElement = document.getElementById("undertale")
-    canvas = document.getElementById("undertale").getContext('2d')
-    joystick = document.getElementById("joystickBack")
-    confirmButton = document.getElementById("confirmButton")
-    backButton = document.getElementById("backButton")
-    let initialMousePosX;
-    let initialMousePosY;
-    let mouseX;
-    let mouseY;
-    let joystickDown = false;
-
-    confirmButton.onclick = function() {
-        document.dispatchEvent(
-            new KeyboardEvent("keydown", {
-              key: "z",
-              keyCode: 90, // example values.
-              code: "KeyZ", // put everything you need in this object.
-              which: 90,
-              shiftKey: false, // you don't need to include values
-              ctrlKey: false,  // if you aren't going to use them.
-              metaKey: false   // these are here for example's sake.
-            })
-          );
-    }
-
-    backButton.onclick = function() {
-        document.dispatchEvent(
-            new KeyboardEvent("keydown", {
-              key: "X",
-              keyCode: 88, // example values.
-              code: "KeyX", // put everything you need in this object.
-              which: 88,
-              shiftKey: false, // you don't need to include values
-              ctrlKey: false,  // if you aren't going to use them.
-              metaKey: false   // these are here for example's sake.
-            })
-          );
-    }
-
-    joystick.ontouchstart = function(event) {
-        console.log("as")
-        joystickDown = true;
-        initialMousePosX = event.targetTouches[0].pageX;
-        initialMousePosY = event.targetTouches[0].pageY;
-        for (let i in undertale.tickables) {
-            undertale.tickables[i].keyPressed(event)
-        }
-    }
-
-    joystick.ontouchend = function(event) {
-        joystickDown = false;
-        let keys = [
-            {name: "ArrowDown", code: 40},
-            {name: "ArrowUp", code: 38},
-            {name: "ArrowRight", code: 39},
-            {name: "ArrowLeft", code: 37},
-        ]
-        let which = -1;
-
-        if (horzKey < 0) {
-            console.log("left")
-            which = 3;
-        } else if (horzKey > 0) {
-            which = 2;
-        } else {
-            which = -1
-        }
-        if (which != -1) {
-            document.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                key: keys[which].name,
-                keyCode: keys[which].code, // example values.
-                code: keys[which].name, // put everything you need in this object.
-                which: keys[which].code,
-                shiftKey: false, // you don't need to include values
-                ctrlKey: false,  // if you aren't going to use them.
-                metaKey: false   // these are here for example's sake.
-                })
-            );
-        }
-
-        if (vertKey < 0) {
-            which = 1;
-        } else if (vertKey > 0) {
-            which = 0;
-        } else {
-            which = -1
-        }
-        if (which != -1) {
-            document.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                key: keys[which].name,
-                keyCode: keys[which].code, // example values.
-                code: keys[which].name, // put everything you need in this object.
-                which: keys[which].code,
-                shiftKey: false, // you don't need to include values
-                ctrlKey: false,  // if you aren't going to use them.
-                metaKey: false   // these are here for example's sake.
-                })
-            );
-        }
-
-        horzKey = 0;
-        vertKey = 0;
-
-
-        for (let i in undertale.tickables) {
-            undertale.tickables[i].keyReleased(event)
-        }
-    }
-
-    document.ontouchmove = function(event) {
-        mouseX = event.targetTouches[0].pageX
-        mouseY = event.targetTouches[0].pageY
-        let sensitivity = 25;
-        if (joystickDown) {
-            if (mouseX - initialMousePosX > -sensitivity && mouseX - initialMousePosX < sensitivity) {
-                horzKey = 0;
-            } else {
-                horzKey = Math.sign(mouseX - initialMousePosX)
-            }
-            if (mouseY - initialMousePosY > -sensitivity && mouseY - initialMousePosY < sensitivity) {
-                vertKey = 0;
-            } else {
-                vertKey = Math.sign(mouseY - initialMousePosY)
-            }
-        }
-    }
-
-    canvas.imageSmoothingEnabled = false;
-    canvas.mozImageSmoothingEnabled = false
-    canvas.webkitImageSmoothingEnabled = false
-    canvas.imageSmoothingQuality = "low"
-
-    //To start the game
-    
-    canvasElement.style.display = "block"
-    undertale = new Undertale();
-    undertale.startBattle({
-        "soulMode": new SoulMode(),
-        "enemies": [new Froggit(), new Froggit()],
-        "gimmick": new BattleGimmick(),
-        "music": "enemy.mp3"
-    })
-    setInterval(function() {
-        globalTime += timeDilation;
-        for (let m in undertale.tickables) {
-            undertale.tickables[m].beginTick();
-            undertale.tickables[m].tick();
-            undertale.tickables[m].checkCollision();
-            undertale.tickables[m].endTick();
-            undertale.tickables[m].render();
-        }
-        if (debugCollision) {
-            for (let m in undertale.collision) {
-                let c = undertale.collision[m]
-                canvas.fillStyle = "rgba(255,0,0,0.5)";
-                if (c.inner) {
-                    canvas.fillRect(c.x,c.y,(c.x1-c.x),(c.y1-c.y))
-                } else {
-                    canvas.fillRect(0,0,640,c.y)
-                    canvas.fillRect(0,c.y,c.x,480)
-                    canvas.fillRect(c.x,c.y1,c.x1,c.y1-c.y)
-                    canvas.fillRect(c.x1,c.y,640,480)
-                }
-            }
-        }
-    },33 * (1/timeDilation))
-    
-}*/
 })
 
 
