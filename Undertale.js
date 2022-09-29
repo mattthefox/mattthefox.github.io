@@ -1,3 +1,13 @@
+// === //
+// TOP
+// Welcome to the massive main file of the game.
+// I really attempted to split things into modular scripts.
+// But I couldn't find out how.
+// Anyway, I've left Better Outline (VSCode extension) headers
+// for you to use if you would like to extend any functionality, implement
+// custom SOUL modes, whatever, so have fun!
+// I'd just hope you Prettify the file first.
+
 var undertale;
 var player;
 var canvas;
@@ -24,6 +34,8 @@ var vertKey = 0;
 var horzKey = 0;
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
+// === //
+// UTILITY FUNCS.
 function SPR(file) {
     let path = "./img/"+file+".png"
     return sprites[path]
@@ -194,29 +206,6 @@ function printAt(context, text, x, y, lineHeight = 32)
     }
 }
 
-var fontLoaded = false;
-
-canvas = document.querySelector('canvas');
-var utFont = new FontFace('utFont', 'url(./DeterminationMono.ttf)');
-var menuFont = new FontFace('menuFont','url(./MenuFont.otf)')
-var damageFont = new FontFace('damageFont','url(./DamageFont.ttf)')
-var bubbleFont = new FontFace("bubbleFont","url(./dotumche-pixel.ttf")
-
-utFont.load().then(function(font){
-  document.fonts.add(font);
-  menuFont.load().then(function(font){
-    document.fonts.add(font);
-    damageFont.load().then(function(font){
-        document.fonts.add(font);
-        bubbleFont.load().then(function(font){
-            document.fonts.add(font);
-            console.log("Fonts Loaded")
-            fontLoaded = true;
-        })
-      });
-  });
-});
-
 document.onkeydown = checkKey;
 document.onkeyup = checkKeyUp;
 
@@ -258,6 +247,31 @@ function checkKeyUp(e) {
         undertale.tickables[i].keyReleased(e)
     }
 }
+
+// === //
+// FONTS
+var fontLoaded = false;
+
+canvas = document.querySelector('canvas');
+var utFont = new FontFace('utFont', 'url(./DeterminationMono.ttf)');
+var menuFont = new FontFace('menuFont','url(./MenuFont.otf)')
+var damageFont = new FontFace('damageFont','url(./DamageFont.ttf)')
+var bubbleFont = new FontFace("bubbleFont","url(./dotumche-pixel.ttf")
+
+utFont.load().then(function(font){
+  document.fonts.add(font);
+  menuFont.load().then(function(font){
+    document.fonts.add(font);
+    damageFont.load().then(function(font){
+        document.fonts.add(font);
+        bubbleFont.load().then(function(font){
+            document.fonts.add(font);
+            console.log("Fonts Loaded")
+            fontLoaded = true;
+        })
+      });
+  });
+});
 
 class Tickable {
     x = 0;
@@ -335,7 +349,18 @@ class Tickable {
         }
     }
 }
+class MasterTick extends Tickable {
 
+    beginTick() {
+    }
+    render() {
+        canvas.fillStyle = "rgba(0,0,0,1)"
+        canvas.fillRect(0,0,640,480)
+    }
+}
+
+// === //
+// ITEM OBJECTS
 class Item {
     constructor(name, seriousModeName, func) {
         this.name = name;
@@ -389,6 +414,8 @@ class BasicHealingItem extends Item {
 const CinnaBun = new BasicHealingItem("CinnaBun","C. Bun.", 10, "Spicy.")
 const Glamburger = new BasicHealingItem("Glamburg", "Burger", 28, "Fabulous!")
 
+// === //
+// UTILITY CLASSES
 class Collision {
     constructor(x,y,x1,y1,blocking = true, inner = true) {
         this.x = x;
@@ -401,16 +428,6 @@ class Collision {
 
     onHit(other) {
         
-    }
-}
-
-class MasterTick extends Tickable {
-
-    beginTick() {
-    }
-    render() {
-        canvas.fillStyle = "rgba(0,0,0,1)"
-        canvas.fillRect(0,0,640,480)
     }
 }
 
@@ -506,6 +523,8 @@ class Sprite {
     }
 }
 
+// === //
+// ATTACK FACTORIES
 class AttackFactory {
     // An attack factory can be called for easy creation of attacks
     // that have similar properties.
@@ -538,8 +557,8 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
     }
 }
 
-// ========================================================================== //
-// Enemies
+// === //
+// ENEMY CLASSES
 
 class Enemy extends Tickable {
     mercy = 0;
@@ -627,11 +646,9 @@ class Enemy extends Tickable {
     }
 
     mercyAnimation() {
-        this.face.tint = new Color(255,255,0,100)
-        this.body.tint = new Color(255,255,0,100)
+        this.sprite.tint = new Color(255,255,0,100)
         setTimeout(function(self = this) {
-            this.face.tint = new Color(0,0,0,0)
-            this.body.tint = new Color(0,0,0,0)
+            this.sprite.tint = new Color(0,0,0,0)
         }.bind(this),200)
     }
 
@@ -680,8 +697,7 @@ class Enemy extends Tickable {
 
     deathAnimation() {
         playSound("monsterdust.wav")
-        this.face.disintegrating = true;
-        this.body.disintegrating = true;
+        this.sprite.disintegrating = true;
     }
 
     spareAnimation() {
@@ -792,6 +808,15 @@ class Froggit extends Enemy {
         this.body.disintegrating = true;
     }
 
+    mercyAnimation() {
+        this.face.tint = new Color(255,255,0,100)
+        this.body.tint = new Color(255,255,0,100)
+        setTimeout(function(self = this) {
+            this.face.tint = new Color(0,0,0,0)
+            this.body.tint = new Color(0,0,0,0)
+        }.bind(this),200)
+    }
+
     spareAnimation() {
         this.frame = this.frameSpareDeath;
         this.body.tint = new Color(0,0,0,50);
@@ -811,7 +836,6 @@ class Froggit extends Enemy {
         let m = new TextBubble("Ribbit, ribbit.", this.face);
         m.confirmed = this.testAttack;
     }
-
     testAttack() {
         var q = Math.round(Math.random()*16 + 1)
         console.log(q)
@@ -925,149 +949,19 @@ class MettatonEX extends Enemy {
 }
 
 // === //
-// Battles and Enemies List
-var storyModeBattles = [
-    // Ruins
-    {
-        "enemies": [Froggit]
-    },
-    {
-        "enemies": [Froggit, Froggit] // Froggit, whimsum
-    },
-    {
-        "enemies": [Froggit, Froggit] // Froggit (x2)
-    },
-    {
-        "enemies": [Froggit, Froggit] // Loox (x2)
-    },
-    {
-        "enemies": [Froggit, Froggit] // Moldsmal (x3)
-    },
-    {
-        "enemies": [Froggit, Froggit] // Moldsmal, Migosp
-    },
-    {
-        "enemies": [Froggit] // Napstablook
-    },
-    {
-        "enemies": [Froggit, Froggit] // Vegetoid (x2)
-    },
-    {
-        "enemies": [Froggit] // Toriel
-    },
-    // Snowdin
-    {
-        "enemies": [Froggit] // Snowdrake
-    },
-    {
-        "enemies": [Froggit] // Icecap
-    },
-    {
-        "enemies": [Froggit] // Icecap, Snowdrake
-    },
-    {
-        "enemies": [Froggit] // Gyftrot
-    },
-    {
-        "enemies": [Froggit] // Snowdrake, Icecap, jerry
-    },
-    {
-        "enemies": [Froggit] // Papyrus
-    },
-    // Waterfall
-    {
-        "enemies": [Froggit] // Aaron
-    },
-    {
-        "enemies": [Froggit] // Aaron, Woshua
-    },
-    {
-        "enemies": [Froggit] // Shyren
-    },
-    {
-        "enemies": [Froggit] // Temmie
-    },
-    {
-        "enemies": [Froggit] // Mad Dummy
-    },
-    {
-        "enemies": [Froggit] // Undyne (or Undying)
-    },
-    // Hotland
-    {
-        "enemies": [Froggit] // Vulkin
-    },
-    {
-        "enemies": [Froggit] // Tsundereplane
-    },
-    {
-        "enemies": [Froggit] // Pyrope
-    },
-    {
-        "enemies": [Froggit] // Mettaton Quiz
-    },
-    {
-        "enemies": [Froggit] // RG 01 and RG 02
-    },
-    // Core
-    {
-        "enemies": [Froggit] // Madjick, Knight Knight
-    },
-    {
-        "enemies": [Froggit] // Final Froggit, Whimsalot
-    },
-    {
-        "enemies": [Froggit] // Astigmatism
-    },
-    {
-        "enemies": [Froggit] // Final Froggit, Whimsalot, Astigmatism (What a nightmare!)
-    },
-    {
-        "enemies": [Froggit] // Mettaton EX
-    },
-    // New Home
-    {
-        "enemies": [Froggit], // Sans
-        "genocide": true
-    },
-    {
-        "enemies": [Froggit] // Asgore
-    },
-    {
-        "enemies": [Froggit] // Omega Flowey (Has his own gimmick)
-    },
-    // True Lab
-    {
-        "enemies": [Froggit], // Memoryhead (x3)
-        "pacifist": true
-    },
-    {
-        "enemies": [Froggit], // Endogeny
-        "pacifist": true
-    },
-    {
-        "enemies": [Froggit], // Reaper Bird
-        "pacifist": true
-    },
-    {
-        "enemies": [Froggit], // Lemon Bread
-        "pacifist": true
-    },
-    {
-        "enemies": [Froggit], // Snowdrake's Mother
-        "pacifist": true
-    },
-    // True Pacifist
-    {
-        "enemies": [Froggit], // Asriel Dreemur
-        "pacifist": true
-    },
-]
+// GIMMICK CLASSES
 
-var enemiesList = {
-    Froggit
+class BattleGimmick {
+    constructor() {
+        
+    }
 }
 
+class KarmaGimmick {
+    constructor() {
+        
+    }
+}
 
 class SpareDust extends Tickable {
     x;
@@ -1149,6 +1043,8 @@ class Bullet extends Tickable {
     }
 }
 
+// === //
+// SOUL CLASSES
 class SoulMode {
     color = new Color(255,0,0)
     sprite;
@@ -1642,6 +1538,160 @@ class Soul extends Tickable {
     }
 }
 
+// === //
+// PRESETS DATA
+var storyModeBattles = [
+    // Ruins
+    {
+        "enemies": [Froggit],
+        "initialSoulMode": SoulModeBlue
+    },
+    {
+        "enemies": [Froggit, Enemy], // Froggit, whimsum
+        "gimmick": KarmaGimmick
+    },
+    {
+        "enemies": [Froggit, Froggit] // Froggit (x2)
+    },
+    {
+        "enemies": [Froggit, Froggit] // Loox (x2)
+    },
+    {
+        "enemies": [Froggit, Froggit, Froggit] // Moldsmal (x3)
+    },
+    {
+        "enemies": [Froggit, Froggit] // Moldsmal, Migosp
+    },
+    {
+        "enemies": [Froggit] // Napstablook
+    },
+    {
+        "enemies": [Froggit, Froggit] // Vegetoid (x2)
+    },
+    {
+        "enemies": [Froggit] // Toriel
+    },
+    // Snowdin
+    {
+        "enemies": [Froggit] // Snowdrake
+    },
+    {
+        "enemies": [Froggit] // Icecap
+    },
+    {
+        "enemies": [Froggit] // Icecap, Snowdrake
+    },
+    {
+        "enemies": [Froggit] // Gyftrot
+    },
+    {
+        "enemies": [Froggit] // Snowdrake, Icecap, jerry
+    },
+    {
+        "enemies": [Froggit] // Papyrus
+    },
+    // Waterfall
+    {
+        "enemies": [Froggit] // Aaron
+    },
+    {
+        "enemies": [Froggit] // Aaron, Woshua
+    },
+    {
+        "enemies": [Froggit] // Shyren
+    },
+    {
+        "enemies": [Froggit] // Temmie
+    },
+    {
+        "enemies": [Froggit] // Mad Dummy
+    },
+    {
+        "enemies": [Froggit] // Undyne (or Undying)
+    },
+    // Hotland
+    {
+        "enemies": [Froggit] // Vulkin
+    },
+    {
+        "enemies": [Froggit] // Tsundereplane
+    },
+    {
+        "enemies": [Froggit] // Pyrope
+    },
+    {
+        "enemies": [Froggit] // Mettaton Quiz
+    },
+    {
+        "enemies": [Froggit] // RG 01 and RG 02
+    },
+    // Core
+    {
+        "enemies": [Froggit] // Madjick, Knight Knight
+    },
+    {
+        "enemies": [Froggit] // Final Froggit, Whimsalot
+    },
+    {
+        "enemies": [Froggit] // Astigmatism
+    },
+    {
+        "enemies": [Froggit] // Final Froggit, Whimsalot, Astigmatism (What a nightmare!)
+    },
+    {
+        "enemies": [Froggit] // Mettaton EX
+    },
+    // New Home
+    {
+        "enemies": [Froggit], // Sans
+        "gimmick": BattleGimmick, // @todo Karma mechanic
+        "genocide": true
+    },
+    {
+        "enemies": [Froggit], // Asgore
+        "gimmick": BattleGimmick // @todo no mercy
+    },
+    {
+        "enemies": [Froggit], // Photoshop Flowey (Has his own gimmick)
+        "gimmick": BattleGimmick // @todo photoshop flowey gimmick
+    },
+    // True Lab
+    {
+        "enemies": [Froggit], // Memoryhead (x3)
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Endogeny
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Reaper Bird
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Lemon Bread
+        "pacifist": true
+    },
+    {
+        "enemies": [Froggit], // Snowdrake's Mother
+        "pacifist": true
+    },
+    // True Pacifist
+    {
+        "enemies": [Froggit], // Asriel Dreemur
+        "pacifist": true
+    },
+]
+
+var enemiesList = [
+    Froggit,
+    MettatonEX,
+    Enemy
+]
+
+// === //
+// UI ELEMENTS
+
 class AttackBar extends Tickable {
     constructor(damage) {
         super()
@@ -1923,12 +1973,6 @@ class TextBubble extends Tickable {
     }
 }
 
-class BattleGimmick {
-    constructor() {
-        
-    }
-}
-
 class Battle {
     items = [
         Glamburger,
@@ -1949,6 +1993,7 @@ class Battle {
     BattleDatatoVars(data) {
         this.initialSoulMode = data.soulMode ? new data.soulMode : new SoulMode()
         for (let x in data.enemies) {
+            console.log(data)
             this.enemies.push(new data.enemies[x])
         }
         this.gimmick = data.gimmick ? data.gimmick : new BattleGimmick()
@@ -2023,7 +2068,7 @@ class Undertale {
     }
 }
     
-function addSelectBox() {
+function addEnemySelect(defaultEnemy) {
     let newEnemy = document.createElement("select");
         let removeButton;
         newEnemy.style.display = "block"
@@ -2035,8 +2080,10 @@ function addSelectBox() {
             removeButton.className += " button"
             removeButton.style.display = "inline-block"
             option.innerHTML = enemiesList[x].name;
+            option.selected = (x == defaultEnemy)
             newEnemy.appendChild(option)
         }
+        //newEnemy.value = defaultEnemy;
         enemiesSlot.appendChild(newEnemy)
         //enemiesSlot.appendChild(removeButton)
 }
@@ -2267,7 +2314,25 @@ function startGame(battleData) {
 }
 }
 
+// === //
+// MAIN MENU
 window.addEventListener('load', function() {
+    const GIMMICKS = [ // @todo add battle gimmicks.
+        BattleGimmick,
+        KarmaGimmick,
+        BattleGimmick,
+        BattleGimmick,
+        BattleGimmick,
+    ]
+    const SOULMODES = [
+        SoulMode,
+        SoulModeBlue,
+        SoulMode, // green
+        SoulModePurple,
+        SoulModeYellow,
+        SoulMode, // cyan
+        SoulMode // orange
+    ]
     enemiesSlot = document.getElementById("enemiesList")
     const PRESET_SELECT = document.getElementById("presetSelect");
     const GIMMICK_SELECT = document.getElementById("gimmickSelect");
@@ -2277,6 +2342,38 @@ window.addEventListener('load', function() {
     const CUSTOM_BEGIN = document.getElementById("customBegin")
     const MAIN_MENU = document.getElementById("mainMenu")
     gamepad_toggle = document.getElementById("gamepadToggle")
+
+    for (let x in storyModeBattles) {
+        let name = "";
+        for (let y in storyModeBattles[x].enemies) {
+            if (y < storyModeBattles[x].enemies.length-1) {
+                name += storyModeBattles[x].enemies[y].name+", "
+            } else {
+                name += storyModeBattles[x].enemies[y].name
+            }
+        }
+        var option = document.createElement("option")
+        option.innerHTML = name;
+        PRESET_SELECT.appendChild(option);
+    }
+
+    PRESET_SELECT.onchange = function(e) {
+        let c = enemiesSlot.children
+        for(let i = c.length - 1;i >= 0;i--) {
+            c[i].remove();
+        }
+        
+        for (let x in storyModeBattles[PRESET_SELECT.selectedIndex].enemies)
+        {
+            let i = storyModeBattles[PRESET_SELECT.selectedIndex].enemies[x]
+            let g = enemiesList.indexOf(i)
+            addEnemySelect(g == -1 ? 0 : g);
+        }
+        let gimmick = GIMMICKS.indexOf(storyModeBattles[PRESET_SELECT.selectedIndex].gimmick)
+        let soulmode = SOULMODES.indexOf(storyModeBattles[PRESET_SELECT.selectedIndex].initialSoulMode)
+        GIMMICK_SELECT.children[gimmick == -1 ? 0 : gimmick].selected = true;
+        SOULMODE_SELECT.children[soulmode == -1 ? 0 : soulmode].selected = true;
+    }
 
     gamepad_toggle.onclick = function(e) {
         // Why is this hard for me lol
@@ -2289,42 +2386,25 @@ window.addEventListener('load', function() {
         confirmButton.style.display = !g ? "block" : "none"
     }
 
-    addSelectBox()
+    addEnemySelect(0)
     ENEMY_ADDER.onclick = function(e) {
-        addSelectBox()
+        addEnemySelect(0)
     }
 
     CUSTOM_BEGIN.onclick = function(e) {
         let enemiesResult = [];
-        let gimmicks = [ // @todo add battle gimmicks.
-            BattleGimmick,
-            BattleGimmick,
-            BattleGimmick,
-            BattleGimmick,
-            BattleGimmick,
-        ]
-        let soulModes = [
-            SoulMode,
-            SoulModeBlue,
-            SoulMode, // green
-            SoulModePurple,
-            SoulModeYellow,
-            SoulMode, // cyan
-            SoulMode // orange
-        ]
         for (const child of enemiesSlot.children) {
-            enemiesResult.push(enemiesList[child.value])
+            enemiesResult.push(enemiesList[child.selectedIndex])
         }
         MAIN_MENU.style.display = "none"
         startGame({
             "enemies": enemiesResult,
-            "soulMode": soulModes[SOULMODE_SELECT.selectedIndex]
+            "soulMode": SOULMODES[SOULMODE_SELECT.selectedIndex],
+            "gimmick": GIMMICKS[GIMMICK_SELECT.selectedIndex]
         })
     }
 
     loadIndicator = document.getElementById("loadIndicator");
 })
-
-
 
 export {Sprite, Tickable, undertale, player}

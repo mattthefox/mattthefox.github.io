@@ -14,10 +14,8 @@
         <canvas color="black" id="undertale" width="640" height ="480" style="display: none; image-rendering: pixelated; font-smooth: never;-webkit-font-smoothing : none;"></canvas>
             <br><br>
             <div id="mainMenu">
-                <select name="Preset Battle" id="presetSelect">
-                    <option>Battle Preset</option>
+                <label>Preset</label><select name="Preset Battle" id="presetSelect">
                 </select>
-                <br><br>
                 <p>Custom Battle</p>
                 <select name="Gimmick" id="gimmickSelect">
                     <option>No Gimmick</option>
@@ -26,7 +24,6 @@
                     <option>No MERCY (Asgore)</option>
                     <option>Insta Kill</option>
                 </select>
-                <br><br>
                 <select name="SOUL Mode" id="soulModeSelect">
                     <option>Red (Free Moving)</option>
                     <option>Blue (Platformer)</option>
@@ -36,13 +33,11 @@
                     <option>Cyan (Dodge from only one place)</option>
                     <option>Orange (Can't Stop)</option>
                 </select>
-                <br><br>
-                <div id="enemiesList"></div>
+                <div id="enemiesList"></div>1
                 <a id="addEnemy" class="button">[+]</a>
                 <br><br>
                 <a id="storyModeBegin" class="button">Story Mode</a>
-                <a id="presetBegin" class="button">Preset</a>
-                <a id="customBegin" class="button">Custom</a>
+                <a id="customBegin" class="button">Begin</a>
             </div>
         <img id="joystickBack" class="unselectable" style="display: none;" src="./img/ui/joystick.png">
         <img id="confirmButton" class="unselectable" style="display: none;" src="./img/ui/circle.png">
