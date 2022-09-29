@@ -64,6 +64,15 @@ p {
 	bottom: 0;
 }
 
+#gamepadToggle {
+	opacity: 20%;
+	touch-action: none;
+	width: 5%;
+	position: fixed;
+	top: 0;
+	right: 0;
+}
+
 #confirmButton {
 	touch-action: none;
 	opacity: 50%;

@@ -18,6 +18,7 @@ var playerDamageMultiplier;
 var globalTime = 0;
 var timeDilation = 1;
 var enemiesSlot;
+var gamepad_toggle = document.getElementById("gamepadToggle")
 
 var vertKey = 0;
 var horzKey = 0;
@@ -47,6 +48,26 @@ function audioLoop(paths, index, callback) {
             callback();
         }
     //}
+}
+
+function getCookie(cname) {
+    let name = cname + "=";
+    let decodedCookie = decodeURIComponent(document.cookie);
+    let ca = decodedCookie.split(';');
+    for(let i = 0; i <ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) == ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(name) == 0) {
+        return c.substring(name.length, c.length);
+      }
+    }
+    return "";
+  }
+
+function setCookie(cname, cvalue) {
+    document.cookie = cname + "=" + cvalue + ";path=/";
 }
 
 Number.prototype.inRange = function(min, max, inclusive = true) {
@@ -2024,6 +2045,7 @@ function startGame(battleData) {
     let throbber = document.getElementById("throbber")
     loadIndicator.style.display = "block";
     throbber.style.display = "block";
+    gamepad_toggle.style.display = "block"
 
     loadSprites([
         "enemy/dummy",
@@ -2254,6 +2276,18 @@ window.addEventListener('load', function() {
     const ENEMY_ADDER = document.getElementById("addEnemy")
     const CUSTOM_BEGIN = document.getElementById("customBegin")
     const MAIN_MENU = document.getElementById("mainMenu")
+    gamepad_toggle = document.getElementById("gamepadToggle")
+
+    gamepad_toggle.onclick = function(e) {
+        // Why is this hard for me lol
+        let g = getCookie("showGamepad");
+        if (g) {
+            setCookie("showGamepad",g)
+        } else {
+            setCookie("showGamepad",false)
+        }
+        confirmButton.style.display = !g ? "block" : "none"
+    }
 
     addSelectBox()
     ENEMY_ADDER.onclick = function(e) {
