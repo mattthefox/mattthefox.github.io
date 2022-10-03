@@ -20,7 +20,6 @@ var textbox;
 var bullets;
 var masterTick;
 var tSounds = {}
-const DEBUG_COLLISION = false;
 var joystick;
 var confirmButton;
 var sprites = {};
@@ -31,6 +30,9 @@ var globalTime = 0;
 var timeDilation = 1;
 var enemiesSlot;
 var gamepad_toggle = document.getElementById("gamepadToggle")
+var MAIN_MENU;
+var gameLoopActive = false;
+var enemyActDoneBefore = false;
 
 var vertKey = 0;
 var horzKey = 0;
@@ -84,12 +86,12 @@ const TWEEN_TYPES = [
 ]
 // obtained via TWEEN_TYPES.LINEAR
 
-function tween(object, inTime = 30,func, type = TWEEN_TYPES.CUBIC) {
+function tween(inTime = 30,func, type = TWEEN_TYPES.CUBIC) {
     let time = 0;
     let t = setInterval(function() {
-        func(type(time / inTime)).call(object)
+        func(1-(time / inTime))
         time += 1
-        if (time = 30) {
+        if (time == inTime) {
             clearInterval(t)
         }
     },33)
@@ -173,7 +175,6 @@ function chooseFlavorText() {
     textbox.setMessage(randomFlavor)
 }
 function enemyAttackDone() {
-    console.log(undertale.tickables)
     if (!player.death) {
         player.chooseSelSprite()
         battlebox.interpTo(32,250,607,385,8);
@@ -204,15 +205,21 @@ function enemyAttackDone() {
 
 }
 function playerActDone() {
-    textbox.hide()
-    for (let x in undertale.battle.enemies) {
-        undertale.battle.enemies[x].attack()
+    if (!enemyActDoneBefore) {
+        enemyActDoneBefore = true;
+        textbox.hide()
+        for (let x in undertale.battle.enemies) {
+            undertale.battle.enemies[x].attack()
+        }
+        player.drawSoul = true;
+        player.collides = true;
+        player.x = 312
+        player.y = 307
+        battlebox.interpTo(235,220,405,395)
+        setTimeout(function() { // fairly bad programming :P
+            enemyActDoneBefore = false;
+        },100)
     }
-    player.drawSoul = true;
-    player.collides = true;
-    player.x = 312
-    player.y = 307
-    battlebox.interpTo(235,220,405,395)
 }
 function dialogLoop(messages,index,func) {
     textbox.setMessage(messages[index]);
@@ -636,6 +643,7 @@ class Enemy extends Tickable {
         this.collides = false;
         this.forcedMercy = false;
         this.enemyNumber = 0;
+        this.sprites = [this.sprite]
     }
 
     init() {
@@ -694,46 +702,47 @@ class Enemy extends Tickable {
         }.bind(this),200)
     }
 
-    onDamage(damage) {
-        //undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
-        this.textY = 0;
-        this.hurtAnimation(false)
-        this.damageGain = damage;
-        this.drawHealthBar = true;
-        if (this.mercy >= 100 && !this.forcedMercy) {
-            playSound("snd_damage.wav")
-            playSound("snd_damage.wav")
-        } else {
-            playSound("snd_damage.wav")
-        }
-        if (this.fearful) {
-            this.mercy = 100;
-            this.forcedMercy = true;
-        }
-        let initHp = this.hp;
-        this.hp = this.hp - damage;
-        let time = 0;
-        let curDir = false;
-        setTimeout(function(self = this) {
-            this.drawHealthBar = false;
-        }.bind(this), 1000)
-        let interval = setInterval(function(self = this) {
-            time += 1;
-            this.xOffset = (Math.pow(Math.sin(time),16)) * 16
-
-            this.visualHp = lerp(this.hp, initHp, time / 20)
-            if (time > 20) {
-                clearInterval(interval)
-                this.hurtAnimation(true)
-                if (this.hp <= 0) {
-                    undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
-                    this.deathAnimation();
-                }
-                if (!undertale.battle.winCheck()) {
-                    playerActDone()
-                }
+    onDamage(damage, success = false) {
+        if (success) {
+            this.textY = 0;
+            this.hurtAnimation(false)
+            this.damageGain = damage;
+            this.drawHealthBar = true;
+            if (this.mercy >= 100 && !this.forcedMercy) {
+                playSound("snd_damage.wav")
+                playSound("snd_damage.wav")
+            } else {
+                playSound("snd_damage.wav")
             }
-        }.bind(this),30)
+            if (this.fearful) {
+                this.mercy = 100;
+                this.forcedMercy = true;
+            }
+            let initHp = this.hp;
+            this.hp = this.hp - damage;
+            let time = 0;
+            let curDir = false;
+            setTimeout(function(self = this) {
+                this.drawHealthBar = false;
+            }.bind(this), 1000)
+            let interval = setInterval(function(self = this) {
+                time += 1;
+                this.xOffset = (Math.pow(Math.sin(time),16)) * 16
+
+                this.visualHp = lerp(this.hp, initHp, time / 20)
+                if (time > 20) {
+                    clearInterval(interval)
+                    this.hurtAnimation(true)
+                    if (this.hp <= 0) {
+                        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+                        this.deathAnimation();
+                    }
+                    if (!undertale.battle.winCheck()) {
+                        playerActDone()
+                    }
+                }
+            }.bind(this),30)
+        }
     }
 
     deathAnimation() {
@@ -743,7 +752,7 @@ class Enemy extends Tickable {
 
     spareAnimation() {
         this.frame = this.frameSpareDeath;
-        this.sprite = 50;
+        //this.sprite = 50;
 
         let dust = new SpareDust(this.x + ((this.sprite.image.naturalWidth / this.sprite.num)/2),this.y + (this.sprite.image.naturalHeight / 2));
         undertale.spawn(dust);
@@ -755,7 +764,10 @@ class Enemy extends Tickable {
         this.spareAnimation();
     }
 
-    spareAttempt() {}
+    spareAttempt() {
+        playerActDone();
+        textbox.hide();
+    }
 
     deferredRender() {
         this.sprite.draw(this.x + this.xOffset,this.y,this.frame)
@@ -813,37 +825,58 @@ class Dummy extends Enemy {
     fearful = false;
     bored = 0;
 
-    actCheck() {
-        super.actCheck();
-        this.bored += 1;
-        this.boredCheck();
+    actCheck(self) {
+        textbox.show();
+        textbox.setMessage(self.description);
+        textbox.confirmed = function() {
+            textbox.hide();
+            self.bored += 1;
+            self.boredCheck();
+        }
+    }
+
+    onDamage(damage, success = false) {
+        super.onDamage(damage, success)
+        if (!success) {
+            this.bored += 1;
+            this.boredCheck()
+        }
     }
 
     attack() {
-        enemyAttackDone()
+        setTimeout(function() {
+            enemyAttackDone()
+        },1000)
     }
 
-    actTalk() {
-        dialogList(["You talk to the DUMMY.\n*...","It doesn't seem much for\nconversation...","TORIEL seems happy with you."], function(self = this) {
-            this.mercy = 100;
-            Enemy.prototype.spare.call(this)
-            playerActDone();
-        }.bind(this))
+    actTalk(self) {
+        dialogList(["You talk to the DUMMY.\n*...","It doesn't seem much for\nconversation...","TORIEL seems happy with you."], function() {
+            self.mercy = 100;
+            //Enemy.prototype.spare.apply()
+            self.spare()
+            self.spared = true;
+            undertale.battle.winCheck();
+        })
     }
 
     spareAttempt() {
         this.bored += 1;
-        this.boredCheck();
+        this.boredCheck(true);
     }
 
-    boredCheck() {
-        if (this.bored > 5) {
+    boredCheck(e = true) {
+        if (this.bored > 3) {
             textbox.show();
-            textbox.setMessage("Dummy tires of your aimless shenanigans.")
+            textbox.setMessage("Dummy tires of your\naimless shenanigans.")
             textbox.confirmed = function(self = this) {
                 this.mercy = 100;
-                Enemy.prototype.spare.call(this)
+                this.spare();
+                undertale.battle.winCheck();
             }.bind(this)
+        } else {
+            if (e) {
+                playerActDone();
+            }
         }
     }
 }
@@ -863,13 +896,18 @@ class Froggit extends Enemy {
         "The enemy is unimpressed with\nthe developer.",
         "The enemy wishes it had a\nremotely challenging attack."
     ]
-    description = "It's an enemy. Wow."
+    description = "Life is difficult for this enemy."
     face = new Sprite("enemy/froggit_face",2);
     body = new Sprite('enemy/froggit_body',2)
     x = 64;
     y = 64;
     frameNorm = 0;
     frameSpareDeath = 1;
+
+    constructor() {
+        super()
+        this.sprites = [this.face,this.body]
+    }
 
     actBeg(self) {
         if (self.mercy.inRange(0,24)) {
@@ -923,8 +961,30 @@ class Froggit extends Enemy {
 
     attack() {
         let m = new TextBubble("Ribbit, ribbit.", this.face);
-        m.confirmed = this.testAttack;
+        m.confirmed = this.frogAttack;
     }
+
+    frogAttack() {
+        var fx = 365;
+        var fy = 355;
+        new AttackFactory(() => {},2)
+        let px = fx
+        let py = fy
+
+        let frog = new Bullet("enemy/froggit_frog",0,0,5,function() {
+            this.x = fx;
+            this.y = fy;
+        },16,16,2)
+        setTimeout(() => {
+            frog.frame = 1 
+            tween(40, (t) => {
+                console.log(fx)
+                fx = lerp(px, 230, t)
+                fy = lerp(py, 290, t*t*t)
+            })
+        },1000) 
+    }
+
     testAttack() {
         var q = Math.round(Math.random()*16 + 1)
         console.log(q)
@@ -1084,9 +1144,11 @@ class SpareDust extends Tickable {
 class Bullet extends Tickable {
     time;
     isBullet = true;
-    constructor(sprite, x, y, damage = 5, movement, collisionWidth = 16, collisionHeight = 16) {
+    frame = 0;
+    constructor(sprite, x, y, damage = 5, movement, collisionWidth = 16, collisionHeight = 16,spriteNum = 1) {
         super()
         this.sprite = new Sprite(sprite);
+        this.sprite.num = spriteNum
         this.x = x;
         this.y = y;
         this.damage = damage;
@@ -1127,7 +1189,7 @@ class Bullet extends Tickable {
     }
 
     render() {
-        this.sprite.draw(this.x,this.y);
+        this.sprite.draw(this.x,this.y,this.frame);
     }
 }
 
@@ -1329,6 +1391,7 @@ class Soul extends Tickable {
             this.x -= 1;
             console.log('dead')
             setTimeout(function(self = this) {
+                undertale.battle.returnToMenu();
                 playSound("snd_dbreak2.wav")
                 self.mode.sprite.img("soul_shard")
                 self.mode.shards = true;
@@ -1473,17 +1536,19 @@ class Soul extends Tickable {
                                 foundOne = true;
                                 undertale.battle.enemies[x].spare();
                                 THEDEADONES.push(undertale.battle.enemies[x])
-                            } else {
-                                undertale.battle.enemies[x].spareAttempt();
                             }
                         }
                         if (!foundOne) {
                             textbox.show();
                             textbox.setMessage("But nobody's names were yellow...")
                             textbox.confirmed = function() {
-                                console.log("efdffjkwfjn")
-                                playerActDone();
-                                textbox.hide();
+                                for (let x in undertale.battle.enemies) {
+                                    if (undertale.battle.enemies[x].mercy < 100) {
+                                        undertale.battle.enemies[x].spareAttempt();
+                                    }
+                                }
+                                //playerActDone();
+                                //textbox.hide();
                             }
                         } else {
                             setTimeout(function() {
@@ -1553,11 +1618,11 @@ class Soul extends Tickable {
         if (this.selectMenu) {
             this.selectedAct = clamp(this.selectedAct + h, 0, 3);
 
-            //if (h != 0) {
+            if (h != 0) {
                 playSound("snd_squeak.wav")
                 this.chooseSelSprite();
                 
-            //}
+            }
         }
         if (clearSelection) {
             this.fightButton.img("ui/fight")
@@ -1634,10 +1699,12 @@ var storyModeBattles = [
     // Ruins
     {
         "enemies": [Dummy],
-        "encounter": "You encountered the Dummy."
+        "encounter": "You encountered the Dummy.",
+        "music": "dummybattle.mp3"
     },
     {
-        "enemies": [Froggit, Enemy], // Froggit, whimsum
+        "enemies": [Froggit], // Froggit, whimsum
+        "encounter": "Froggit and its cohorts appear!"
     },
     {
         "enemies": [Froggit, Froggit] // Froggit (x2)
@@ -1800,18 +1867,24 @@ class AttackBar extends Tickable {
 
     keyPressed(e) {
         if (this.canPress) {
+            let didDamage = false;
             if (e.keyCode == 90 || e.keyCode == 13) { // Z
                 console.log(this.damage)
                 this.canPress = false;
+                didDamage = true;
                 let playerDamageMultiplier = -Math.abs((2 * this.progress) - 1) + 1;
                 let u = undertale.battle.enemies[player.selectedListItem];
+                u.onDamage(this.damage * playerDamageMultiplier,true)
                 if (u.mercy >= 100 && !u.forcedMercy) {
                     playerDamageMultiplier = 99999;
                 }
                 this.moving = false;
                 this.flicker = true;
-                undertale.battle.enemies[player.selectedListItem].onDamage(this.damage * playerDamageMultiplier)
+                
                 setTimeout(function(self = this) {
+                    if (!didDamage) {
+                        undertale.battle.enemies[player.selectedListItem].onDamage(0,false)
+                    }
                     this.destroy()
                     if (!undertale.battle.winCheck) {
                         playerActDone();
@@ -2098,7 +2171,7 @@ class Battle {
     winCheck() {
         let allDead = true;
         for (let x in this.enemies) {
-            if (this.enemies[x].hp > 0 || this.enemies[x].spared) {
+            if (this.enemies[x].hp > 0 && !this.enemies[x].spared) {
                 allDead = false;
             }
         }
@@ -2110,11 +2183,19 @@ class Battle {
             SND(this.music).pause()
             textbox.show()
             textbox.setMessage("YOU WON! You earned... nothing?")
+            this.returnToMenu();
             return true;
         } else {
             return false;
         }
-    } 
+    }
+
+    returnToMenu() {
+        setTimeout(function() {
+            MAIN_MENU.style.display = "block"
+            canvasElement.style.display = "none"
+        },3000)
+    }
 }
 
 class Undertale {
@@ -2181,65 +2262,7 @@ function addEnemySelect(defaultEnemy) {
 }
 
 function startGame(battleData) {
-    let throbber = document.getElementById("throbber")
-    loadIndicator.style.display = "block";
-    throbber.style.display = "block";
-    gamepad_toggle.style.display = "block"
-
-    loadSprites([
-        "enemy/dummy",
-        "ui/textBubble",
-        "ui/ut_smoke",
-        "ui/_act",
-        "ui/act",
-        "ui/_fight",
-        "ui/fight",
-        "ui/_item",
-        "ui/item",
-        "ui/_mercy",
-        "ui/mercy",
-        "ui/attackbar",
-        "battle_slash",
-        "soul_dead",
-        "soul_shard",
-        "soul",
-        "enemy/froggit_body",
-        "enemy/froggit_face",
-        "ui/attackbar_indi1",
-        "ui/attackbar_indi2",
-        "enemy/mex_body",
-        "enemy/mex_face",
-        "enemy/mex_arms"
-    ], spritesLoaded)
-
-    function spritesLoaded() {
-        loadAudio([
-            "enemy.mp3",
-            "hurt.wav",
-            "snd_dbreak.wav",
-            "snd_dbreak2.wav",
-            "snd_heartshot.wav",
-            "snd_select.wav",
-            "snd_squeak.wav",
-            "SND_TXT2.wav",
-            "snd_damage.wav",
-            "monsterdust.wav"
-        ], audioLoaded)
-    }
-
-    function lol() {
-
-    }
-
-    function audioLoaded() {
-        
-    throbber.style.display = "none"
-    loadIndicator.style.display = "none"
-    canvasElement = document.getElementById("undertale")
-    canvas = document.getElementById("undertale").getContext('2d')
-    joystick = document.getElementById("joystickBack")
-    confirmButton = document.getElementById("confirmButton")
-    backButton = document.getElementById("backButton")
+    
 
     confirmButton.style.display="block"
     joystick.style.display="block"
@@ -2378,33 +2401,40 @@ function startGame(battleData) {
     canvasElement.style.display = "block"
     undertale = new Undertale();
     undertale.startBattle(battleData)
-    setInterval(function() {
-        globalTime += timeDilation;
-        for (let m in undertale.tickables) {
-            undertale.tickables[m].beginTick();
-            undertale.tickables[m].tick();
-            undertale.tickables[m].checkCollision();
-            undertale.tickables[m].endTick();
-            undertale.tickables[m].render();
-        }
-        if (DEBUG_COLLISION) {
-            for (let m in undertale.collision) {
-                let c = undertale.collision[m]
-                canvas.fillStyle = "rgba(255,0,0,0.5)";
-                if (c.inner) {
-                    canvas.fillRect(c.x,c.y,(c.x1-c.x),(c.y1-c.y))
-                } else {
-                    canvas.fillRect(0,0,640,c.y)
-                    canvas.fillRect(0,c.y,c.x,480)
-                    canvas.fillRect(c.x,c.y1,c.x1,c.y1-c.y)
-                    canvas.fillRect(c.x1,c.y,640,480)
+    if (!gameLoopActive) {
+        gameLoopActive = true;
+        setInterval(function() {
+            globalTime += timeDilation;
+            for (let m in undertale.tickables) {
+                undertale.tickables[m].beginTick();
+                undertale.tickables[m].tick();
+                undertale.tickables[m].checkCollision();
+                undertale.tickables[m].endTick();
+                undertale.tickables[m].render();
+            }
+            if (DEBUG_COLLISION) {
+                for (let m in undertale.collision) {
+                    let c = undertale.collision[m]
+                    canvas.fillStyle = "rgba(255,0,0,0.5)";
+                    if (c.inner) {
+                        canvas.fillRect(c.x,c.y,(c.x1-c.x),(c.y1-c.y))
+                    } else {
+                        canvas.fillRect(0,0,640,c.y)
+                        canvas.fillRect(0,c.y,c.x,480)
+                        canvas.fillRect(c.x,c.y1,c.x1,c.y1-c.y)
+                        canvas.fillRect(c.x1,c.y,640,480)
+                    }
                 }
             }
-        }
-    },33 * (1/timeDilation))
+        },33 * (1/timeDilation))
+    }
     
 }
-}
+
+// === //
+// ⭐ DEBUGGING
+const debugStartBattle = 1; // default: undefined
+const DEBUG_COLLISION = false;
 
 // === //
 // MAIN MENU
@@ -2432,8 +2462,14 @@ window.addEventListener('load', function() {
     const ENEMY_SELECT = document.getElementById("enemySelect");
     const ENEMY_ADDER = document.getElementById("addEnemy")
     const CUSTOM_BEGIN = document.getElementById("customBegin")
-    const MAIN_MENU = document.getElementById("mainMenu")
+    MAIN_MENU = document.getElementById("mainMenu")
     gamepad_toggle = document.getElementById("gamepadToggle")
+    loadIndicator = document.getElementById("loadIndicator");
+    canvasElement = document.getElementById("undertale")
+    canvas = document.getElementById("undertale").getContext('2d')
+    joystick = document.getElementById("joystickBack")
+    confirmButton = document.getElementById("confirmButton")
+    backButton = document.getElementById("backButton")
 
     for (let x in storyModeBattles) {
         let name = "";
@@ -2449,6 +2485,63 @@ window.addEventListener('load', function() {
         PRESET_SELECT.appendChild(option);
     }
 
+    let gameLoop;
+    let throbber = document.getElementById("throbber")
+    loadIndicator.style.display = "block";
+    throbber.style.display = "block";
+    gamepad_toggle.style.display = "block"
+
+    loadSprites([
+        "enemy/dummy",
+        "ui/textBubble",
+        "ui/ut_smoke",
+        "ui/_act",
+        "ui/act",
+        "ui/_fight",
+        "ui/fight",
+        "ui/_item",
+        "ui/item",
+        "ui/_mercy",
+        "ui/mercy",
+        "ui/attackbar",
+        "battle_slash",
+        "soul_dead",
+        "soul_shard",
+        "soul",
+        "enemy/froggit_body",
+        "enemy/froggit_face",
+        "enemy/froggit_frog",
+        "ui/attackbar_indi1",
+        "ui/attackbar_indi2",
+        "enemy/mex_body",
+        "enemy/mex_face",
+        "enemy/mex_arms"
+    ], spritesLoaded)
+
+    function spritesLoaded() {
+        loadAudio([
+            "enemy.mp3",
+            "dummybattle.mp3",
+            "hurt.wav",
+            "snd_dbreak.wav",
+            "snd_dbreak2.wav",
+            "snd_heartshot.wav",
+            "snd_select.wav",
+            "snd_squeak.wav",
+            "SND_TXT2.wav",
+            "snd_damage.wav",
+            "monsterdust.wav"
+        ], audioLoaded)
+    }
+
+    function lol() {
+
+    }
+
+    function audioLoaded() {
+        
+    throbber.style.display = "none"
+    loadIndicator.style.display = "none"
     PRESET_SELECT.onchange = function(e) {
         let c = enemiesSlot.children
         for(let i = c.length - 1;i >= 0;i--) {
@@ -2496,7 +2589,11 @@ window.addEventListener('load', function() {
         })
     }
 
-    loadIndicator = document.getElementById("loadIndicator");
+    if (debugStartBattle != -1) {
+        MAIN_MENU.style.display = "none"
+        startGame(storyModeBattles[debugStartBattle])
+    }
+    }
 })
 
 export {Sprite, Tickable, undertale, player}
