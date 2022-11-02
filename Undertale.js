@@ -43,14 +43,14 @@ const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 class DummyClass {
     static pause() {}
 }
-
 function choose(choices) {
     return choices[Math.round(Math.random() * (choices.length - 1))]
 }
-
 function wrapChoice(choices,val) {
     return choices[Math.round(val % (choices.length))]
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 
 // === //
 // UTILITY FUNCS.
@@ -101,6 +101,7 @@ function getCookie(cname) {
 
 function defaultBattleBox() {
     battlebox.interpTo(235,220,405,395)
+    player.collides = true;
     player.x = 312
     player.y = 307
 }
@@ -212,39 +213,41 @@ function chooseFlavorText() {
     textbox.setMessage(randomFlavor)
 }
 function enemyAttackDone() {
-    player.dodgeMode = false;
-    if (!player.death) {
-        player.chooseSelSprite()
-        battlebox.interpTo(32,250,607,385,8);
-        player.collides = false;
-        player.death = false;
-        player.selectMenu = true;
-        player.targetSelect = false;
-        player.actTargetSelect = false;
-        player.actMenu = false;
-        player.fightMenu = false;
-        player.selectedListItem = 0;
-        player.attackMenu = false;
-        player.listLength = 0;
-        player.attackProg = 1;
-        textbox.show()
-    }
-    let kill = [];
-    for (let x = 0; x < undertale.tickables.length; x++) {
-        if (undertale.tickables[x].isBullet) {
-            //Have to append to another one because itd result in an array that changes while being iterated.
-            kill.push(undertale.tickables[x])
+    if (player.dodgeMode) {
+        player.dodgeMode = false;
+        if (!player.death) {
+            player.chooseSelSprite()
+            battlebox.interpTo(32,250,607,385,8);
+            player.collides = false;
+            player.death = false;
+            player.selectMenu = true;
+            player.targetSelect = false;
+            player.actTargetSelect = false;
+            player.actMenu = false;
+            player.fightMenu = false;
+            player.selectedListItem = 0;
+            player.attackMenu = false;
+            player.listLength = 0;
+            player.attackProg = 1;
+            textbox.show()
         }
+        let kill = [];
+        for (let x = 0; x < undertale.tickables.length; x++) {
+            if (undertale.tickables[x].isBullet) {
+                //Have to append to another one because itd result in an array that changes while being iterated.
+                kill.push(undertale.tickables[x])
+            }
+        }
+        for (let x in kill) {
+            kill[x].destroy()
+        }
+        chooseFlavorText();
     }
-    for (let x in kill) {
-        kill[x].destroy()
-    }
-    chooseFlavorText();
-
 }
 function playerActDone() {
-    player.dodgeMode = true;
-    if (!playerActDoneBefore) {
+    if (!player.dodgeMode && !playerActDoneBefore) {
+        console.log("player act done")
+        player.dodgeMode = true;
         playerActDoneBefore = true;
         textbox.hide()
         for (let x in undertale.battle.enemies) {
@@ -257,7 +260,7 @@ function playerActDone() {
         //player.y = 307
         setTimeout(function() { // fairly bad programming :P
             playerActDoneBefore = false;
-        },100)
+        },500)
     }
 }
 function dialogLoop(messages,index,func) {
@@ -485,7 +488,7 @@ class Tickable {
     }
 }
 class MasterTick extends Tickable {
-
+    priority = -5
     beginTick() {
     }
     render() {
@@ -538,18 +541,22 @@ class Sprite {
     file;
     tint;
     image;
+    visible = true;
     loaded = false;
     prevLoaded = false;
     scale = new Vector2(1,1);
     x;
     y;
     rot;
+    frame = 0;
+    autoDraw;
 
-    constructor(file, num = 1) {
+    constructor(file, num = 1,autoDraw = false) {
         this.num = num;
         this.image = SPR(file)
         this.disintegrateTime = 0;
         this.disintegrate = []
+        this.autoDraw = autoDraw
         for (let x = 0; x < this.image.naturalHeight; x++) {
             this.disintegrate.push({y: (x * .1) + 32})
         }
@@ -557,55 +564,58 @@ class Sprite {
         this.tint = new Color(0,0,0,0);
     }
 
-    draw(x = 0,y = 0,frame = 0,rotation = 0, origin = new Vector2(0.5,0.5)) {
-        this.x = x;
-        this.y = y;
-        this.rot = rotation;
-        let localOrigin = new Vector2(origin.x * this.image.naturalWidth, origin.y * this.image.naturalHeight)
-        canvas.save();
-        canvas.translate(localOrigin.x + x, localOrigin.y + y);
-        canvas.rotate((Math.PI / 180) * rotation);
-        canvas.translate(-localOrigin.x - x, -localOrigin.y - y);
+    draw(x = 0,y = 0,frame = this.frame,rotation = 0, origin = new Vector2(0.5,0.5)) {
+        if (this.visible) {
+            this.x = x;
+            this.y = y;
+            this.rot = rotation;
+            let localOrigin = new Vector2(origin.x * this.image.naturalWidth, origin.y * this.image.naturalHeight)
+            canvas.save();
+            canvas.translate(localOrigin.x + x, localOrigin.y + y);
+            canvas.rotate((Math.PI / 180) * rotation);
+            canvas.translate(-localOrigin.x - x, -localOrigin.y - y);
 
-        if (this.image.complete) {
-            
-            let w = this.image.naturalWidth / this.num
-            if (this.disintegrating) {
-                //this.disintegrateTime += .1
-                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
-                // Fade out while it disintegrates +Math.max(30 / this.disintegrateTime,0)+
-                canvas.fillStyle = "rgba(0,0,0,"+Math.max(this.disintegrateTime/10,0)+")"
-                canvas.fillRect(x,y,this.image.naturalWidth / this.num, this.image.naturalHeight)
-                this.disintegrateTime += 1.5
-                for (let d in this.disintegrate) {
-                    this.disintegrate[d].y -= Math.random() * 4
-                    canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(100 - (this.disintegrateTime * 4), 0)),2)
-                }
-                /*
-                for (let a = 0; a < this.image.naturalHeight; a++) {
-                    let b = (this.disintegrateTime+1) * a - this.disintegrateTime * 80
-                    canvas.drawImage(this.image,frame * w,a,w,1,x,y + b,w * Math.abs(this.scale.x),Math.abs(this.scale.y));
-                }*/
+            if (this.image.complete) {
                 
-            } else {
-                canvas.save()
-                if (this.scale.x < 0) {
-                    canvas.scale(-1,1)
-                    canvas.translate(-640,0)
+                let w = this.image.naturalWidth / this.num
+                if (this.disintegrating) {
+                    //this.disintegrateTime += .1
+                    canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w,this.image.naturalHeight);
+                    // Fade out while it disintegrates +Math.max(30 / this.disintegrateTime,0)+
+                    canvas.fillStyle = "rgba(0,0,0,"+Math.max(this.disintegrateTime/10,0)+")"
+                    canvas.fillRect(x,y,this.image.naturalWidth / this.num, this.image.naturalHeight)
+                    this.disintegrateTime += 1.5
+                    for (let d in this.disintegrate) {
+                        this.disintegrate[d].y -= Math.random() * 4
+                        canvas.drawImage(this.image, x + ((Math.random() * 256)) * (this.disintegrateTime/ 64), y + (this.disintegrate[d].y * 2) + d,(Math.max(100 - (this.disintegrateTime * 4), 0)),2)
+                    }
+                    /*
+                    for (let a = 0; a < this.image.naturalHeight; a++) {
+                        let b = (this.disintegrateTime+1) * a - this.disintegrateTime * 80
+                        canvas.drawImage(this.image,frame * w,a,w,1,x,y + b,w * Math.abs(this.scale.x),Math.abs(this.scale.y));
+                    }*/
+                    
+                } else {
+                    canvas.save()
+                    if (this.scale.x < 0) {
+                        canvas.scale(-1,1)
+                        canvas.translate(-640,0)
+                    }
+                    canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w * Math.abs(this.scale.x),this.image.naturalHeight * Math.abs(this.scale.y));
+                    canvas.restore()
                 }
-                canvas.drawImage(this.image,frame * w,0,w,this.image.naturalHeight,x,y,w * Math.abs(this.scale.x),this.image.naturalHeight * Math.abs(this.scale.y));
-                canvas.restore()
             }
+            
+            canvas.globalCompositeOperation = "multiply"
+            canvas.fillStyle = "rgba("+this.tint.r+","+this.tint.g+","+this.tint.b+","+(this.tint.a / 100)+")"
+            canvas.fillRect(x,y,(this.image.naturalWidth / this.num) * this.scale.x,(this.image.naturalHeight) * this.scale.y)
+            canvas.rotate((Math.PI / 180) * -rotation);
+            canvas.globalCompositeOperation = "source-over"
+            canvas.fillStyle = "white"
+            canvas.restore();
         }
-        
-        canvas.globalCompositeOperation = "multiply"
-        canvas.fillStyle = "rgba("+this.tint.r+","+this.tint.g+","+this.tint.b+","+(this.tint.a / 100)+")"
-        canvas.fillRect(x,y,this.image.naturalWidth / this.num,this.image.naturalHeight)
-        canvas.rotate((Math.PI / 180) * -rotation);
-        canvas.globalCompositeOperation = "source-over"
-        canvas.fillStyle = "white"
-        canvas.restore();
     }
+
 
     img(file) {
         this.image = SPR(file)
@@ -626,7 +636,21 @@ class AttackFactory {
         this.loops = []
         this.timer = timer;
         attack(this);
-        this.timeOut = setTimeout(this.endFactory,timer * 1000)
+        this.timeOut = setTimeout(() => {
+            this.completed();
+                for (let x in activeAttackFactories) {
+                    let i = activeAttackFactories[x]
+                    for (let y in i.loops) {
+                        clearInterval(i.loops[y])
+                    }
+                }
+                activeAttackFactories = [];
+                if (player.dodgeMode) {
+                    if (!player.death) {
+                        enemyAttackDone()
+                    }
+                }
+        },timer * 1000)
         
         /*
         let thisLongestAttack = true;
@@ -644,19 +668,8 @@ class AttackFactory {
 
     }
 
-    endFactory() {
-        for (let x in activeAttackFactories) {
-            let i = activeAttackFactories[x]
-            for (let y in i.loops) {
-                clearInterval(i.loops[y])
-            }
-        }
-        activeAttackFactories = [];
-        if (player.dodgeMode) {
-            if (!player.death) {
-                enemyAttackDone()
-            }
-        }
+    completed() {
+
     }
 
     loop(func,time) {
@@ -664,7 +677,6 @@ class AttackFactory {
         this.loops.push(e)
     }
 }
-
 class SpearsAttackFactory {
     spears = []
     actualSpears = []
@@ -674,8 +686,8 @@ class SpearsAttackFactory {
         //   udlr for the direction that the player must face
         //    to dodge it, or the direction the spear is
         //    coming from.
-        //   * is a rest
-        //   ^ before to have it be a reversed spear
+        //    * is a rest
+        //    ^ before to have it be a reversed spear
         // * place a number 1-9 before to change speed (5 is default)
         //   example:
         //     1u**2l**2d**3r**3u*4d*4d*^5r*
@@ -709,7 +721,7 @@ class SpearsAttackFactory {
                     "l": 3
                 }
                 this.spears.push({
-                    "dir": dirMap[pattern[index]],
+                    "dir":dirMap[pattern[index]],
                     "reverse":reverse,
                     "speed":speed,
                     "beat":lastBeat
@@ -748,7 +760,6 @@ class SpearsAttackFactory {
         }.bind(this),this.curSpear > 0 && this.curSpear < this.spears.length ? (this.spears[this.curSpear].beat-this.spears[this.curSpear-1].beat) * this.restLength : 1)
     }
 }
-
 class Spear extends Tickable {
     owner;
     index;
@@ -833,7 +844,64 @@ class Spear extends Tickable {
     }
 }
 
-function basicTextAct(enemy, message, mercyCounter = 0) {
+class TimedSequence {
+    constructor(data) {
+        this.data = data;
+        this.current = 0;
+        // data format is
+        /* 
+        [
+            {
+                "function": *callback*,
+                "delta": *seconds*,
+                "arg": 0
+            }
+        ]
+        */
+       // "Function" will be called with a 'current index' parameter as well as the "arg" parameter,
+       //   since the best use case of these is an attack like Loox's. 
+    }
+
+    loopAction() {
+        this.data[this.current].function(this.current, this.data[this.current].arg ? arg : 0);
+        this.current += 1;
+        if (this.current < this.data.length) {
+            setTimeout(this.loopAction,this.data[this.current-1].delta * 1000)
+        }
+    }
+}
+
+class LoopedAction {
+    constructor(func,count,delay,instant=true) {
+        this.current = 0;
+        this.func = func;
+        this.delay = delay;
+        this.count = count;
+        if (instant) {
+            this.loop(this);
+        }
+        this.myInterval = setInterval(() => this.loop(this),this.delay*1000)
+    }
+
+    loop(self) {
+        if (this.current < this.count) {
+            self.func(self.current)
+            self.current += 1;
+        } else {
+            self.completed();
+            clearInterval(self.myInterval)
+        }
+    }
+
+    stop() {
+        this.current = 99999;
+        clearTimeout(this.myInterval)
+    }
+
+    completed() {}
+}
+
+function basicTextAct(enemy, message, mercyCounter = 0, func) {
     textbox.show();
     textbox.setMessage(message);
     textbox.confirmed = function() {
@@ -843,18 +911,20 @@ function basicTextAct(enemy, message, mercyCounter = 0) {
         setTimeout(function(self = this) {
             playerActDone();
             textbox.hide();
+            func();
         }.bind(this),500)
     }
 }
 
 // === //
 // ⭐ ENEMY CLASSES
-
 class Enemy extends Tickable {
     mercy = 0;
     maxHp = 1;
     name = "Enemy"
     acts = []
+    battleBackground = 1;
+    bbgWave = 0;
     flavorTexts = [
         "Flavor Text"
     ]
@@ -866,11 +936,12 @@ class Enemy extends Tickable {
     frameSpareDeath = 0;
     turns = 0;
     dead = false;
+    priority = 1;
     fearful = true; // Able to be spared instantly when attacked?
 
     constructor() {
         super()
-        this.priority = 1;
+        this.priority = 2;
         this.visualMercy = this.mercy;
         this.visualHp = this.maxhp;
         this.drawHealthBar = false;
@@ -1083,6 +1154,7 @@ class Dummy extends Enemy {
     ]
     description = "A cotton heart and a button eye\nYou are the apple of my eye"
     fearful = false;
+    battleBackground = 0;
     bored = 0;
 
     actCheck(self) {
@@ -1154,7 +1226,7 @@ class Froggit extends Enemy {
     face = new Sprite("enemy/froggit_face",2);
     body = new Sprite('enemy/froggit_body',2);
     x = 64;
-    y = 64;
+    y = 128;
     frameNorm = 0;
     frameSpareDeath = 1;
     dialog = "Ribbit,\nribbit."
@@ -1226,6 +1298,7 @@ class Froggit extends Enemy {
         let py = fy
 
         let frog = new Bullet(new Sprite("enemy/froggit_frog"),0,0,5,function() {
+            this.sprite.num = 2;
             this.x = fx;
             this.y = fy;
         },24,24,2,new Vector2(8,8))
@@ -1339,6 +1412,335 @@ class Whimsun extends Enemy {
 
     deferredRender() {
         this.sprite.draw(this.x + this.xOffset,this.y + (Math.sin(this.spriteTime * .2) * 8),this.frame)
+    }
+}
+
+class Loox extends Enemy {
+    maxHp = 50;
+    name = "Loox"
+    difficulty = 0;
+    acts = [
+        {"name": "Pick On", "func": this.actPickOn},
+        {"name": "Don't Pick On", "func": this.actDontPickOn},
+    ]
+    flavorTexts = [ 
+        "Loox is staring right through\nyou.",
+        "Loox is gazing at you.",
+        "Loox gnashes its teeth.",
+        "Smells like eyedrops."
+    ]
+    description = "Don't pick on him. Family name:\nEyewalker. "
+    sprite = new Sprite("enemy/loox",5);
+    x = 128;
+    y = 64;
+    dialog = "Please\ndon't pick\non me."
+    dialogOffset = new Vector2(24,-16)
+
+    actPickOn(self) {
+        self.dialog = "You rude\nlittle snipe!"
+        basicTextAct(self,"You picked on Loox.")
+        self.difficulty = Math.min(self.difficulty + 1,3)
+    }
+
+    actDontPickOn(self) {
+        if (self.mercy < 100) {
+            self.dialog = "Finally\nsomeone\ngets it."
+            basicTextAct(self,"You decide not to pick on Loox.",100)
+        } else {
+            self.dialog = "It's a real\npleasure!"
+            basicTextAct(self,"You continue to refrain from\npicking on Loox.")
+        }
+    }
+
+    attack() {
+        defaultBattleBox()
+        let m = new TextBubble(this.dialog, this.sprite,true,this.dialogOffset);
+        m.confirmed = this.wormsAttack;
+    }
+
+    circlesAttack() {
+
+    }
+
+    wormsAttack() {
+            var sign = 1;
+            new AttackFactory(()=>{
+                new LoopedAction((n) => {
+                    sign = n % 2 == 0 ? -1 : 1; // alternate sign per bullet.
+                    var centerX = 300
+                    var centerY = 250 + (n * 32)
+                    
+                    new Bullet(new Sprite("enemy/looxattacks",2),centerX,0,3,function() {
+                        this.s = sign;
+                        this.cy = centerY;
+                        this.x += this.s * (3);
+                        this.y = this.cy + Math.sin((globalTime*2) * .2) * 8;
+                    }).centerX = centerX;centerY = centerY; // send the main variable to these guys.
+                    let small1 = new Sprite("enemy/looxattacks",2)
+                    new Bullet(small1,centerX-(sign*16),0,3,function() {
+                        this.frame = 1;
+                        this.s = sign;
+                        this.cx = centerX;
+                        this.cy = centerY;
+                        this.x += this.s * (3);
+                        this.y = this.cy + Math.sin(((globalTime-3)*2) * .2) * 4;
+                    }).centerX = centerX;centerY = centerY;
+                    new Bullet(small1,centerX-(sign*32),0,3,function() {
+                        this.frame = 1;
+                        this.s = sign;
+                        this.cx = centerX;
+                        this.cy = centerY;
+                        this.x += this.s * (3);
+                        this.y = this.cy + Math.sin(((globalTime-6)*2) * .2) * 4;
+                    }).centerX = centerX;centerY = centerY;
+                },500,1)
+            },4)
+    }
+
+    deferredRender() {
+        this.sprite.scale = new Vector2(2,2)
+        var l = Math.round(Math.max(Math.sin(this.spriteTime * .3),0) * 3)
+        this.sprite.draw(this.x + this.xOffset,this.y,l)
+    }
+}
+
+class Napstablook extends Enemy {
+    maxHp = 88;
+    name = "Napstablook"
+    priotity = 1;
+    acts = [
+        {"name": "Threat", "func": this.actThreat},
+        {"name": "Cheer", "func": this.actCheer},
+        {"name": "Flirt", "func": this.actFlirt},
+    ]
+    textboxOffset = new Vector2(64,18)
+    flavorTexts = [ 
+        "Loox is staring right through\nyou.",
+        "Loox is gazing at you.",
+        "Loox gnashes its teeth.",
+        "Smells like eyedrops."
+    ]
+    battleBackground = 2;
+    difficulty = 1;
+    description = "This monster doesn't seem to have a\nsense of humor..."
+    sprite = new Sprite("enemy/napstablook",2);
+    hat = new Sprite("enemy/dapperblook",5)
+    hatFrame = -1
+    mercy = 0;
+    x = 256;
+    y = 80;
+    dialog = "nnnnnnggghhh."
+    state = 0;
+    fearful = false;
+    deferDialog = false;
+    // 0 - 3: Cheered or flirted. Threatening 
+    constructor() {
+        super()
+        this.hat.scale = new Vector2(2,2)
+    }
+    //  once will lower by 1,
+    //  threatening after dapper blook sets it to -6.
+
+    actCheck(self) {
+        super.actCheck(self);
+        self.dialog = "oh, i'm\nREAL funny."
+    }
+
+    actThreat(self) {
+        if (self.state > 3) {
+            self.state = -3;
+            self.dialog = "now i see\nhow it\nis..."
+        } else {
+            self.dialog = "go ahead,\ndo it."
+        }
+        playerActDone();
+    }
+
+    actCheer(self) {
+        let f;
+        if (self.state == 0) { f = "You gave Napstablook a patient smile.";self.flavorTexts = ["Napstablook looks just a little bit\nbetter."]} else
+        if (self.state == 1) { f = "You told Napstablook a little joke.";self.flavorTexts = ["Cheering seems to have improved\nNapstablook's mood again."]} else 
+        if (self.state == 2) { f = "Napstablook wants to show you\nsomething.";self.flavorTexts = ["Napstablook eagerly awaits your\nresponse."]} else
+        if (self.state > 3) {
+            undertale.battle.background.fadeOut();
+            dialogList(["oh no...","i usually come to the RUINS\nbecause there's nobody around...","but today i met somebody nice...", "...", "oh, i'm rambling again", "i'll get out of your way"], () => {
+                self.mercy = 100;
+                self.spare();
+                undertale.battle.winCheck();
+            })
+        } else
+        {f = "You try to console Napstablook..."}
+        if (f) {
+            textbox.show();
+            textbox.setMessage(f)
+            textbox.confirmed = (n = self) => {
+                self.deferDialog = true;
+                var e;
+                if (n.state == 0) { e = "heh..."} else 
+                if (n.state == 1) { e = "heh heh..."} else
+                if (n.state == 2) { // activates dapperblook.
+                    n.state = 3;
+                    playerActDone();
+                }
+                if (e) {
+                    let m = new TextBubble(e, n.sprite, true, self.textboxOffset);
+                    m.confirmed = () => {playerActDone()}
+                }
+                n.state += 1;
+            }
+        }
+    }
+
+    actFlirt(self) {
+        self.state += 1;
+        new TextBubble("i'd just weigh you\ndown.",self.sprite, true, self.textboxOffset).confirmed = () => {
+            playerActDone();
+        }
+    }
+
+    attack() {
+        //
+        if (this.state == 3) {
+            defaultBattleBox();
+            let m = new TextBubble("let me try...", this.sprite, true, this.textboxOffset);
+            m.confirmed = () => {
+                new LoopedAction((n) => {this.hatFrame = n},5,0.4).completed = () => {
+                    m = new TextBubble("i call it\n'dapper\nblook...'", this.sprite, true, this.textboxOffset);
+                    m.confirmed = () => {
+                        m = new TextBubble("do you like\nit...", this.sprite, true, this.textboxOffset);
+                        m.confirmed = () => {
+                            enemyAttackDone();
+                        }
+                    }
+                }
+            }
+        } else {
+            if (this.turns == 1) {
+                player.collides = true;
+                player.x = 312
+                player.y = 307
+                battlebox.interpTo(195,220,435,395)
+            } else {
+                defaultBattleBox()
+            }
+            let m = new TextBubble(this.dialog, this.sprite, true, this.textboxOffset);
+            this.dialog = choose(["nnnnnng\ngghhh.", "just pluggin\nalong...", "i'm fine,\nthanks."])
+            m.confirmed = () => {
+                if (this.turns == 2) {
+                    this.notFeelinIt();
+                } else {
+                    wrapChoice([this.wallTearsAttack,this.EyeTearsAttack,this.EyeTearsAttack],this.turns-1)(this);
+                }
+            }
+        }
+    }
+
+    spareAnimation() {
+        this.tick = () => {this.x += 7}
+    }
+
+    circlesAttack() {
+
+    }
+
+    notFeelinIt() {
+        new AttackFactory(() => {
+            let s = new Sprite("enemy/really_blook");
+            s.scale = new Vector2(2,2)
+            let e = new Bullet(s,5,5,-1)
+            let t = undertale.spawn(new Tickable());
+            t.tick = () => {
+                e.x = 215 + (Math.random())
+                e.y = 250 + (Math.random())
+            }
+        },3).completed(() =>  {
+            t.destroy();
+            e.destroy();
+        })
+    }
+
+    wormsAttack() {
+        new AttackFactory(function(self) {
+            var side = choose([0,1])
+            var centerX = [240,480]
+            centerX = centerX[side]
+            var centerY = 250
+
+            new Bullet(new Sprite("enemy/looxattacks",2),0,0,3,function() {
+                this.x = centerX + globalTime;
+                this.y = centerY + Math.sin(globalTime * .2) * 8;
+            })
+            new Bullet(new Sprite("enemy/looxattacks",2),0,0,3,function() {
+                this.x = centerX + globalTime;
+                this.y = centerY + Math.sin((globalTime - .5) * .2) * 8;
+            })
+        },4)
+    }
+
+    wallTearsAttack(self) {
+        //x.interpTo(235,220,405,395)
+        var L;
+        var A = new AttackFactory(() => {
+            L = new LoopedAction(() => {
+                let b = new Bullet(new Sprite("enemy/napstablook_bullets",2),((390-245)*Math.random()) + 245,220,6,function(){
+                    this.y += this.yspd;
+                    this.x += this.xspd;
+                    if (this.y > 385 && (this.yspd != 0)) {
+                        this.yspd = 0;
+                        this.xspd = choose([-4-(self.difficulty*2),4+(self.difficulty*2)])
+                        this.rember = this.xspd;
+                    }
+                    if ((this.x < 240 || this.x > 388) && this.xspd != 0) {
+                        this.xspd = 0;
+                        this.yspd = -4-(self.difficulty*2);
+                    }
+                    if (this.yspd < 0 && this.y < 230 && this.yspd != 0) {
+                        this.xspd = -this.rember;
+                        this.yspd = 0;
+                        setTimeout(() => {
+                            this.xspd = 0;
+                            this.yspd = 4+(self.difficulty*2)
+                        },(Math.random() * 500)+500)
+                    }
+                    if (this.xspd != 0) {
+                        this.rot = 90;
+                    } else {
+                        this.rot = 0;
+                    }
+                },6,16,new Vector2(8,0))
+                b.yspd = 4+(self.difficulty*2);
+                b.xspd = 0;
+                b.rember = 0;
+            },20+(self.difficulty*10),0.5-(self.difficulty*0.3))
+        },6)
+        A.completed = () => {L.stop();console.log(L)}
+
+    }
+
+    EyeTearsAttack(self) {
+        let L;
+        console.log(self)
+        new AttackFactory(() => {
+            L = new LoopedAction(() => {
+                let s = new Sprite("enemy/napstablook_bullets",2)
+                let b = new Bullet(s,320,100,6,function() {
+                    this.timer += 1;
+                    this.y += Math.min(Math.pow((-.08 * this.timer),2),8)
+                    this.x += this.direction * this.speed
+                    this.frame = 1
+                })
+                b.speed = Math.random() * 3
+                b.direction = choose([-1,1])
+                b.timer = 0;
+            },40+(self.difficulty * 10),0.1-(self.difficulty * 0.06))
+        },4).completed = () => {L.stop()}
+    }
+
+    deferredRender() {
+        this.sprite.scale = new Vector2(2,2)
+        var l = Math.round(this.spriteTime * .1 % 1)
+        this.sprite.draw(this.x + this.xOffset,this.y,l)
+        this.hat.draw(285,44,this.hatFrame)
     }
 }
 
@@ -1491,11 +1893,12 @@ class Bullet extends Tickable {
     homeAmount = 0; 
     time = 0;
     rot = 0;
-    constructor(sprite, x, y, damage = 5, movement = () => {}, collisionWidth = 16, collisionHeight = 16,spriteNum = 1,collisionOffset = new Vector2(0,0)) {
+    timer = 0;
+    constructor(sprite, x, y, damage = 5, movement = () => {}, collisionWidth = 16, collisionHeight = 16,collisionOffset = new Vector2(0,0)) {
         super()
+        this.priority = 2.1;
         //this.sprite = new Sprite(sprite);
         this.sprite = sprite;
-        this.sprite.num = spriteNum
         this.x = x;
         this.y = y;
         this.damage = damage;
@@ -1507,12 +1910,14 @@ class Bullet extends Tickable {
         this.movement = movement;
         this.offset = collisionOffset;
         this.collision.onHit = function(other) {
-            if (other == player) {
-                if (player.invincibility == 0) {
-                    player.invincibility = 35;
-                    player.onDamage(damage)
-                }
+            if (damage >= 0) {
+                if (other == player) {
+                    if (player.invincibility == 0) {
+                        player.invincibility = 35;
+                        player.onDamage(damage)
+                    }
 
+                }
             }
         }
         undertale.collision.push(this.collision)
@@ -1743,6 +2148,7 @@ class Soul extends Tickable {
 
     constructor() {
         super();
+        this.priority = 2.1
         this.mode = undertale.battle.initialSoulMode
         this.mode.owner = this;
         this.maxHp = ((undertale.love-1) * 3.78) + 20
@@ -1763,9 +2169,6 @@ class Soul extends Tickable {
             this.invincibility -= 1;
         }
         this.mode.tick()
-        if (this.mode.hurtCondition) {
-            // death
-        }
         if (this.selectMenu) {
             // 40, 195
             this.x = 40 + (this.selectedAct * 156)
@@ -1896,6 +2299,7 @@ class Soul extends Tickable {
                 playSound("snd_select.wav");
             }
             if (this.selectMenu) {
+                this.dodgeMode = false;
                 this.selectMenu = false;
                 switch (this.selectedAct) {
                     case 0: // fight
@@ -1953,14 +2357,9 @@ class Soul extends Tickable {
                                         undertale.battle.enemies[x].spareAttempt();
                                     }
                                 }
-                                //playerActDone();
-                                //textbox.hide();
                             }
                         } else {
                             setTimeout(function() {
-                                // If we didn't win,
-                                // Retire all spared enemies
-                                
                                 for (let x in THEDEADONES) {
                                     undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(THEDEADONES[x]),1)
                                 }
@@ -2102,6 +2501,48 @@ class Soul extends Tickable {
     }
 }
 
+class BattleBackground extends Tickable {
+    constructor(waves = 0,type=0) {
+        super()
+        this.priority = 0.01;
+        this.type = type;
+        if (this.type == 0) {
+            this.bg = new Sprite("ui/bbg");
+            this.waves = waves;
+        } else {
+            this.bg = new Sprite("ui/bbg2")
+            this.bg2 = new Sprite("ui/bbg2")
+            this.bg2.scale = new Vector2(1,1)
+        }
+
+    }
+
+    render() {
+        if (this.type == 0) {
+            for (let x = 0; x < 6;x++) {
+                this.bg.draw((x * 100)+20,8 + Math.sin((globalTime*5)+x) * this.waves)
+            }
+        } else {
+            this.bg.draw(32)
+            this.bg2.draw(420,0,0,-180)
+        }
+    }
+
+    fadeOut() {
+        if (this.type == 0) {
+            new Tween(50,(t) => {
+                console.log("iuhlsfc")
+                this.bg.tint = new Color(0,0,0,(1-t*t)*100)
+            })
+        } else {
+            new Tween(50,(t) => {
+                this.bg.tint = new Color(0,0,0,(1-t*t)*100)
+                this.bg2.tint = new Color(0,0,0,(1-t*t)*100)
+            })
+        }
+    }
+}
+
 // === //
 // ⭐ PRESETS DATA
 var storyModeBattles = [
@@ -2120,10 +2561,14 @@ var storyModeBattles = [
         "encounter": "Froggit and Whimsun drew near!"
     },
     {
-        "enemies": [Froggit, Froggit] // Loox (x2)
+        "enemies": [Froggit, Froggit, Froggit] // Moldsmal (x3)
     },
     {
-        "enemies": [Froggit, Froggit, Froggit] // Moldsmal (x3)
+        "enemies": [Napstablook],
+        "encounter":"Here comes Napstablook."
+    },
+    {
+        "enemies": [Loox, Loox] // Loox (x2)
     },
     {
         "enemies": [Froggit, Froggit] // Moldsmal, Migosp
@@ -2253,7 +2698,9 @@ var enemiesList = [
     Dummy,
     Froggit,
     Whimsun,
-    Enemy
+    Enemy,
+    Loox,
+    Napstablook
 ]
 
 // === //
@@ -2262,6 +2709,7 @@ var enemiesList = [
 class AttackBar extends Tickable {
     constructor(damage) {
         super()
+        this.priority = 2.1
         this.damage = damage;
         this.sprite = new Sprite("ui/attackbar");
         this.indicator = new Sprite("ui/attackbar_indi1")
@@ -2327,6 +2775,7 @@ class AttackBar extends Tickable {
 class BattleBox extends Tickable {
     constructor() {
         super()
+        this.priority = 2
         this.x1 = 32;
         this.x2 = 607;
         this.y1 = 250;
@@ -2389,12 +2838,18 @@ class BattleBox extends Tickable {
             this.y2 = this.y2f;
         }
         this.collision.x = this.x1;
-        this.collision.y = this.y1;
-        this.collision.x1 = this.x2 - 12;
-        this.collision.y1 = this.y2 - 12;
+        this.collision.y = this.y1 + 2;
+        this.collision.x1 = this.x2 - 16;
+        this.collision.y1 = this.y2 - 18;
     }
 
     render() {
+        canvas.beginPath();
+        canvas.fillStyle = "black";
+        canvas.fillRect(this.x1,this.y1,(this.x2-this.x1),(this.y2-this.y1))
+        canvas.stroke()
+
+
         canvas.beginPath();
         canvas.lineWidth = "5";
         canvas.strokeStyle = "white";
@@ -2406,6 +2861,7 @@ class BattleBox extends Tickable {
 class TypingText extends Tickable {
     constructor(message) {
         super()
+        this.priority = 2.1
         this.message = message;
         this.curLetter = 0;
         this.curMessage = ""
@@ -2432,6 +2888,7 @@ class TypingText extends Tickable {
             if (e.keyCode == 90 || e.keyCode == 13) { // Z
                 if (this.curLetter >= this.message.length) {
                     this.pressedo = true;
+                    console.log("textbox confirmed")
                     this.confirmed();
                 }
             } else
@@ -2482,14 +2939,16 @@ class TypingText extends Tickable {
 }
 
 class TextBubble extends Tickable {
-    constructor(message, speaker, confirmable = false, offset = new Vector2(0,-32)) {
+    constructor(message, speaker, confirmable = false, offset = new Vector2(0,-32), extraSize = new Vector2(0,0)) {
         super()
         this.message = message;
         this.speaker = speaker;
         this.curLetter = 0;
+        this.priority = 0.6
         this.curMessage = "";
         this.offset = offset;
         this.prevMessage = message;
+        this.extraSize = extraSize;
         let i = setInterval(function(self = this) {
             if (self.curLetter < self.message.length) {
                 self.curMessage = self.curMessage + self.message.charAt(self.curLetter);
@@ -2527,8 +2986,8 @@ class TextBubble extends Tickable {
     render() {
         let x = this.speaker.x + (this.speaker.image.naturalWidth/this.speaker.num) + 8
         let y = this.speaker.y - 32;
-        let w = 128;
-        let h = 64;
+        let w = 128 + this.extraSize.x;
+        let h = 64 + this.extraSize.y;
         let offset = this.offset;
         canvas.fillStyle = "white"
         canvas.fillRect(x+offset.x+1,y+offset.y+1,w+15,h+15)
@@ -2562,6 +3021,7 @@ class Battle {
     seriousMode = false;
     data;
     enemies = []
+    background;
     constructor(data) {
         this.data = data;
         this.BattleDatatoVars(data)
@@ -2577,6 +3037,9 @@ class Battle {
         this.music = data.music ? data.music : "enemy.mp3"
         for (let x = 0; x < this.enemies.length; x++) {
             this.enemies[x].enemyNumber = x;
+        }
+        if (this.enemies[0].battleBackground != 0) {
+            this.background = undertale.spawn(new BattleBackground(this.enemies[0].bbgWave,this.enemies[0].battleBackground));
         }
         this.encounter = data.encounter ? data.encounter : "Encounter Message\n*Change this"
     }
@@ -2849,7 +3312,7 @@ function startGame(battleData) {
 
 // === //
 // ⭐ DEBUGGING
-const debugStartBattle = 2; // default: undefined
+const debugStartBattle = 4; // default: undefined
 const DEBUG_COLLISION = false;
 
 // === //
@@ -2909,6 +3372,14 @@ window.addEventListener('load', function() {
 
     loadSprites([
         "enemy/dummy",
+        "enemy/dapperblook",
+        "enemy/really_blook",
+        "enemy/napstablook_bullets",
+        "ui/bbg",
+        "ui/bbg2",
+        "enemy/loox",
+        "enemy/looxattacks",
+        "enemy/napstablook",
         "ui/textBubble",
         "ui/ut_smoke",
         "ui/_act",
