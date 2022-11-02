@@ -1521,7 +1521,7 @@ class Napstablook extends Enemy {
         "Smells like eyedrops."
     ]
     battleBackground = 2;
-    difficulty = 1;
+    difficulty = 0;
     description = "This monster doesn't seem to have a\nsense of humor..."
     sprite = new Sprite("enemy/napstablook",2);
     hat = new Sprite("enemy/dapperblook",5)
@@ -1548,6 +1548,7 @@ class Napstablook extends Enemy {
 
     actThreat(self) {
         if (self.state > 3) {
+            self.difficulty = 1;
             self.state = -3;
             self.dialog = "now i see\nhow it\nis..."
         } else {
