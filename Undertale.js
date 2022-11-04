@@ -106,13 +106,6 @@ function defaultBattleBox() {
     player.y = 307
 }
 
-const TWEEN_TYPES = [
-    {LINEAR: (x) => x},
-    {SQUARED: (x) => x^2},
-    {CUBIC: (x) => x^3}
-]
-// obtained via TWEEN_TYPES.LINEAR
-
 class Tween {
     onComplete = () => {}
     completed = false;
@@ -133,22 +126,6 @@ class Tween {
         this.onComplete = func;
     }
 }
-
-/* Examples of some tweening operations:
-
-    let px = this.x;
-    let py = this.y
-    new Tween(30, (t) => {
-        this.x = lerp(px, this.x, t)
-        this.y = lerp(py, this.y, t)
-    })
-
-    let pcolor = this.sprite.tint;
-    new Tween(30, (t) => {
-        this.sprite.tint = pcolor.lerp(new Color(1,0,0,0),t)
-    })
-
-*/
 
 function setCookie(cname, cvalue) {
     document.cookie = cname + "=" + cvalue + ";path=/";
@@ -473,8 +450,12 @@ class Tickable {
                                 } else if (this.y == this.prevY) { // moving x
                                     this.x += (this.prevX-this.x);
                                 } else {
-                                    this.y += (this.prevY-this.y);
-                                    this.x += (this.prevX-this.x);
+                                    if (this.y < c.y || this.y > c.y1) {
+                                        this.y += (this.prevY-this.y);
+                                    }
+                                    if (this.x < c.x || this.x > c.x1) {
+                                        this.x += (this.prevX-this.x);
+                                    }
                                 }
                             }
                             //c.onHit(this);
@@ -631,12 +612,14 @@ class AttackFactory {
     // as such, therefore removing the need for a big array of objects)
     // Asgore's various circles of fire or Mettaton's disco ball attack.
     constructor(attack, timer = 3) {
+        player.mode.enabled = true;
         activeAttackFactories.push(this)
         player.collides = true;
         this.loops = []
         this.timer = timer;
         attack(this);
         this.timeOut = setTimeout(() => {
+            player.mode.enabled = false;
             this.completed();
                 for (let x in activeAttackFactories) {
                     let i = activeAttackFactories[x]
@@ -669,7 +652,6 @@ class AttackFactory {
     }
 
     completed() {
-
     }
 
     loop(func,time) {
@@ -928,10 +910,12 @@ class Enemy extends Tickable {
     flavorTexts = [
         "Flavor Text"
     ]
+    outcomeImportant = true;
     description = "It's an enemy. Wow."
     sprite = new Sprite("enemy/dummy");
     x = 128;
     y = 64;
+    canDie = true;
     frameNorm = 0;
     frameSpareDeath = 0;
     turns = 0;
@@ -988,6 +972,10 @@ class Enemy extends Tickable {
             playerActDone();
             textbox.hide();
         }
+    }
+
+    onScriptedDeath(self) {
+
     }
 
     addMercy(amount) {
@@ -1059,8 +1047,12 @@ class Enemy extends Tickable {
                     clearInterval(interval)
                     this.hurtAnimation(true)
                     if (this.hp <= 0) {
-                        undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
-                        this.deathAnimation();
+                        if (this.canDie) {
+                            undertale.battle.enemies.splice(undertale.battle.enemies.indexOf(this),1)
+                            this.deathAnimation();
+                        } else {
+                            this.onScriptedDeath(this)
+                        }
                     }
                     if (!undertale.battle.winCheck()) {
                         playerActDone()
@@ -1471,20 +1463,19 @@ class Loox extends Enemy {
                     var centerY = 250 + (n * 32)
                     
                     new Bullet(new Sprite("enemy/looxattacks",2),centerX,0,3,function() {
-                        this.s = sign;
-                        this.cy = centerY;
+                        this.s = 0;
                         this.x += this.s * (3);
                         this.y = this.cy + Math.sin((globalTime*2) * .2) * 8;
-                    }).centerX = centerX;centerY = centerY; // send the main variable to these guys.
+                    }).centerX = centerX;centerY = centerY;s = sign; 
                     let small1 = new Sprite("enemy/looxattacks",2)
                     new Bullet(small1,centerX-(sign*16),0,3,function() {
                         this.frame = 1;
-                        this.s = sign;
+                        this.s = 0;
                         this.cx = centerX;
                         this.cy = centerY;
                         this.x += this.s * (3);
                         this.y = this.cy + Math.sin(((globalTime-3)*2) * .2) * 4;
-                    }).centerX = centerX;centerY = centerY;
+                    }).centerX = centerX;centerY = centerY;s=sign
                     new Bullet(small1,centerX-(sign*32),0,3,function() {
                         this.frame = 1;
                         this.s = sign;
@@ -1493,7 +1484,7 @@ class Loox extends Enemy {
                         this.x += this.s * (3);
                         this.y = this.cy + Math.sin(((globalTime-6)*2) * .2) * 4;
                     }).centerX = centerX;centerY = centerY;
-                },500,1)
+                },4,1)
             },4)
     }
 
@@ -1529,6 +1520,8 @@ class Napstablook extends Enemy {
     mercy = 0;
     x = 256;
     y = 80;
+    canDie = false;
+    outcomeImportant = false;
     dialog = "nnnnnnggghhh."
     state = 0;
     fearful = false;
@@ -1538,8 +1531,15 @@ class Napstablook extends Enemy {
         super()
         this.hat.scale = new Vector2(2,2)
     }
-    //  once will lower by 1,
-    //  threatening after dapper blook sets it to -6.
+
+    onScriptedDeath(self) {
+        undertale.battle.background.fadeOut();
+        dialogList(["oh no...","i'm sorry...","i was just lowering my hp\ncause i didn't wanna be rude...","sorry\ni'll get out of your way"], () => {
+            self.mercy = 100;
+            self.spare();
+            undertale.battle.winCheck();
+        })
+    }
 
     actCheck(self) {
         super.actCheck(self);
@@ -1586,6 +1586,8 @@ class Napstablook extends Enemy {
                 if (e) {
                     let m = new TextBubble(e, n.sprite, true, self.textboxOffset);
                     m.confirmed = () => {playerActDone()}
+                } else {
+                    playerActDone();
                 }
                 n.state += 1;
             }
@@ -1637,13 +1639,12 @@ class Napstablook extends Enemy {
     }
 
     spareAnimation() {
-        this.tick = () => {this.x += 7}
+        this.tick = () => {
+            this.x += 7
+            this.hat.x += 7
+        }
     }
-
-    circlesAttack() {
-
-    }
-
+    
     notFeelinIt() {
         new AttackFactory(() => {
             let s = new Sprite("enemy/really_blook");
@@ -1658,24 +1659,6 @@ class Napstablook extends Enemy {
             t.destroy();
             e.destroy();
         })
-    }
-
-    wormsAttack() {
-        new AttackFactory(function(self) {
-            var side = choose([0,1])
-            var centerX = [240,480]
-            centerX = centerX[side]
-            var centerY = 250
-
-            new Bullet(new Sprite("enemy/looxattacks",2),0,0,3,function() {
-                this.x = centerX + globalTime;
-                this.y = centerY + Math.sin(globalTime * .2) * 8;
-            })
-            new Bullet(new Sprite("enemy/looxattacks",2),0,0,3,function() {
-                this.x = centerX + globalTime;
-                this.y = centerY + Math.sin((globalTime - .5) * .2) * 8;
-            })
-        },4)
     }
 
     wallTearsAttack(self) {
@@ -2003,10 +1986,54 @@ class SoulMode {
 }
 
 class SoulModeBlue extends SoulMode {
+    enabled = false;
     color = new Color(0,0,255)
     velocity = 0;
     jumpTimer = 0;
-    touchingGround;
+    touchingGround = false;
+    prevX = 0;
+    prevY = 0;
+    yspd = 0;
+    xspd = 0;
+    time = 0;
+    gravity = new Vector2(0,1)
+    gravityV = true;
+
+    tick() {
+        if (this.enabled) {
+            if (!this.owner.death) {
+                this.time += 0.05
+                if (this.gravityV) {
+                    this.touchingGround = (this.owner.y == this.prevY)
+                } else {
+                    this.touchingGround = (this.owner.x == this.prevX)
+                }
+                this.owner.y += this.yspd//
+                this.owner.x += this.xspd//
+                this.yspd += this.gravity.y*0.3;
+                this.xspd += this.gravity.x*0.3;
+                //
+                this.owner.x += (horzKey * 3 * this.gravity.x) + (horzKey * 3 * this.gravity.y)
+                this.owner.y += (vertKey * 3 * Math.abs(this.gravity.y)) + (vertKey * 3 * Math.abs(this.gravity.x))
+                //
+
+                this.prevY = this.owner.y
+                this.prevX = this.owner.x
+            }
+            console.log(this.touchingGround);
+        }
+    }
+
+    keyPressed(e) {
+        if (e.keyCode == '38') {
+            if (this.enabled) {
+                if (!this.touchingGround) {
+                    this.yspd = -3 * this.gravity.y;
+                    this.xspd = -3 * this.gravity.x;
+                }
+            }
+        }
+    }
 }
 
 class SoulModeGreen extends SoulMode {
@@ -2184,6 +2211,7 @@ class Soul extends Tickable {
     onDamage(hp) {
         this.hp -= hp;
         if (this.hp <= 0 && !this.death) {
+            this.changeSoulMode(SoulMode)
             this.dodgeMode = false;
             this.hp = 0;
             SND(undertale.battle.music).pause()
@@ -2566,13 +2594,15 @@ var storyModeBattles = [
     },
     {
         "enemies": [Napstablook],
-        "encounter":"Here comes Napstablook."
+        "encounter":"Here comes Napstablook.",
+        "soulMode": SoulModeBlue
     },
     {
         "enemies": [Loox, Loox] // Loox (x2)
     },
     {
-        "enemies": [Froggit, Froggit] // Moldsmal, Migosp
+        "enemies": [Froggit], // Moldsmal, Migosp
+        "soulMode": SoulModeBlue,
     },
     {
         "enemies": [Froggit] // Napstablook
@@ -3281,6 +3311,7 @@ function startGame(battleData) {
     undertale.startBattle(battleData)
     if (!gameLoopActive) {
         gameLoopActive = true;
+
         setInterval(function() {
             globalTime += timeDilation;
             for (let m in undertale.tickables) {
